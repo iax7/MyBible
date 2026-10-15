@@ -79,19 +79,6 @@ const (
 
 const emptyReference = "—"
 
-var (
-	barStyle       = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252"))
-	keyStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	labelStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	refStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
-	warningStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	helpStyle      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 3)
-	italicsStyle   = lipgloss.NewStyle().Italic(true)
-	jesusStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	verseNumStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	cursorNumStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-)
-
 // Options configures where the reader finds its state. Empty fields fall back
 // to the XDG config directory and to the Module directory named in config.
 type Options struct {
@@ -110,6 +97,10 @@ type Model struct {
 	translations []module.Translation
 	active       string
 	warnings     []string
+
+	cfg    config.Config // the loaded config, kept so saving state does not drop keys
+	lang   lang
+	styles styles
 
 	text    *module.Text
 	book    module.Book
@@ -138,6 +129,9 @@ func New(opts Options) Model {
 	if err != nil {
 		m.warnings = append(m.warnings, err.Error())
 	}
+	m.cfg = cfg
+	m.lang = resolveLanguage(cfg.Language)
+	m.styles = newStyles(paletteFor(cfg.Theme, cfg.Colors))
 
 	m.moduleDir = opts.ModuleDir
 	if m.moduleDir == "" {
@@ -256,14 +250,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // persist writes the Active translation, the Module directory, and the
-// last-read Reference to config, reporting a write failure as a warning rather
-// than losing the change silently.
+// last-read Reference to config, keeping the theme and language it was loaded
+// with, and reporting a write failure as a warning rather than losing the
+// change silently.
 func (m Model) persist() Model {
 	if m.configDir == "" {
 		m.warnings = append(m.warnings, "cannot save the reader's state: no config directory")
 		return m
 	}
-	cfg := config.Config{ModuleDir: m.moduleDir, ActiveTranslation: m.active}
+	cfg := m.cfg
+	cfg.ModuleDir = m.moduleDir
+	cfg.ActiveTranslation = m.active
+	cfg.LastReference = ""
 	if reference, ok := m.currentReference(); ok {
 		cfg.LastReference = reference.String()
 	}
@@ -331,46 +329,46 @@ func (m Model) paneContent(height int) string {
 	var b strings.Builder
 	switch {
 	case m.moduleDir == "":
-		b.WriteString("No Module directory configured.\n\n")
-		b.WriteString("Set module_directory in " + config.Path(m.configDir) + "\n")
-		b.WriteString("to the folder holding your MyBible *.SQLite3 modules.")
+		b.WriteString(m.translate("No Module directory configured.") + "\n\n")
+		b.WriteString(fmt.Sprintf(m.translate("Set module_directory in %s"), config.Path(m.configDir)) + "\n")
+		b.WriteString(m.translate("to the folder holding your MyBible *.SQLite3 modules."))
 	case len(m.translations) == 0:
-		b.WriteString("No Bible Modules found in " + m.moduleDir + ".\n\n")
-		b.WriteString("Put your *.SQLite3 modules there, then restart the reader.")
+		b.WriteString(fmt.Sprintf(m.translate("No Bible Modules found in %s."), m.moduleDir) + "\n\n")
+		b.WriteString(m.translate("Put your *.SQLite3 modules there, then restart the reader."))
 	case m.active == "":
-		b.WriteString("No Active translation.\n\n")
-		b.WriteString("Press " + keyTranslation + " to choose one.")
+		b.WriteString(m.translate("No Active translation.") + "\n\n")
+		fmt.Fprintf(&b, m.translate("Press %s to choose one."), keyTranslation)
 	case m.book.Number != 0:
 		b.WriteString(m.chapterView(height))
 	default:
 		t, _ := m.activeTranslation()
 		b.WriteString(t.Title + "\n\n")
-		b.WriteString(labelStyle.Render(t.Language))
+		b.WriteString(m.styles.label.Render(t.Language))
 	}
 	for _, warning := range m.warnings {
-		b.WriteString("\n\n" + warningStyle.Render("warning: "+warning))
+		b.WriteString("\n\n" + m.styles.warning.Render(m.translate("warning: ")+warning))
 	}
 	return b.String()
 }
 
 // renderMarkup renders a Verse's inline markup in the supported subset.
-func renderMarkup(text string) string {
+func (m Model) renderMarkup(text string) string {
 	var b strings.Builder
 	for _, run := range module.ParseMarkup(text) {
-		b.WriteString(runStyle(run).Render(run.Text))
+		b.WriteString(m.runStyle(run).Render(run.Text))
 	}
 	return b.String()
 }
 
 // runStyle is the display style for one Run of Verse text.
-func runStyle(run module.Run) lipgloss.Style {
+func (m Model) runStyle(run module.Run) lipgloss.Style {
 	switch {
 	case run.Red && run.Italics:
-		return jesusStyle.Italic(true)
+		return m.styles.jesus.Italic(true)
 	case run.Red:
-		return jesusStyle
+		return m.styles.jesus
 	case run.Italics:
-		return italicsStyle
+		return m.styles.italics
 	}
 	return lipgloss.NewStyle()
 }
@@ -389,7 +387,7 @@ func (m Model) activeTranslation() (module.Translation, bool) {
 func (m Model) barView() string {
 	parts := make([]string, 0, len(Commands))
 	for _, c := range Commands {
-		parts = append(parts, keyStyle.Render(c.Key)+" "+labelStyle.Render(c.Label))
+		parts = append(parts, m.styles.key.Render(c.Key)+" "+m.styles.label.Render(m.translate(c.Label)))
 	}
 	left := strings.Join(parts, "  ")
 
@@ -397,7 +395,7 @@ func (m Model) barView() string {
 	if reference, ok := m.currentReference(); ok {
 		right = reference.String()
 	}
-	right = refStyle.Render(right)
+	right = m.styles.reference.Render(right)
 
 	// When the commands and the Reference do not fit side by side, the Reference
 	// moves to its own line so neither is silently cut off.
@@ -406,8 +404,8 @@ func (m Model) barView() string {
 		if gap < 0 {
 			gap = 0
 		}
-		return barStyle.Width(m.width).Render(left) + "\n" +
-			barStyle.Width(m.width).Render(strings.Repeat(" ", gap)+right)
+		return m.styles.bar.Width(m.width).Render(left) + "\n" +
+			m.styles.bar.Width(m.width).Render(strings.Repeat(" ", gap)+right)
 	}
 
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
@@ -415,28 +413,28 @@ func (m Model) barView() string {
 		gap = 1
 	}
 	line := left + strings.Repeat(" ", gap) + right
-	return barStyle.Width(m.width).MaxWidth(m.width).Render(line)
+	return m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
 }
 
 // helpView is the modal listing every keybinding, centred on the screen.
 func (m Model) helpView() string {
 	var b strings.Builder
-	b.WriteString(labelStyle.Render("Keys"))
+	b.WriteString(m.styles.label.Render(m.translate("Keys")))
 	b.WriteString("\n\n")
 	for _, c := range Commands {
-		b.WriteString(binding(c.Key, c.Label))
+		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
 	}
-	b.WriteString(binding(keyBack, "Back"))
-	b.WriteString(binding(keyForward, "Forward"))
-	b.WriteString(binding(keyToggleBar, "Toggle top bar"))
-	b.WriteString(binding(keyClose, "Close"))
+	b.WriteString(binding(m.styles, keyBack, m.translate("Back")))
+	b.WriteString(binding(m.styles, keyForward, m.translate("Forward")))
+	b.WriteString(binding(m.styles, keyToggleBar, m.translate("Toggle top bar")))
+	b.WriteString(binding(m.styles, keyClose, m.translate("Close")))
 
-	box := helpStyle.Render(strings.TrimRight(b.String(), "\n"))
+	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-func binding(key, label string) string {
-	return keyStyle.Render(pad(key, 10)) + labelStyle.Render(label) + "\n"
+func binding(s styles, key, label string) string {
+	return s.key.Render(pad(key, 10)) + s.label.Render(label) + "\n"
 }
 
 func pad(s string, width int) string {

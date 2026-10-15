@@ -24,6 +24,23 @@ type Config struct {
 	ModuleDir         string `toml:"module_directory"`
 	ActiveTranslation string `toml:"active_translation"`
 	LastReference     string `toml:"last_reference"`
+	Theme             string `toml:"theme"`
+	Language          string `toml:"language"`
+	Colors            Colors `toml:"colors"`
+}
+
+// Colors overrides individual theme colors. An empty field keeps the theme's
+// own color; a value is an ANSI256 number or a hex color.
+type Colors struct {
+	Bar       string `toml:"bar"`
+	BarText   string `toml:"bar_text"`
+	Key       string `toml:"key"`
+	Label     string `toml:"label"`
+	Reference string `toml:"reference"`
+	Warning   string `toml:"warning"`
+	Jesus     string `toml:"jesus"`
+	VerseNum  string `toml:"verse_num"`
+	CursorNum string `toml:"cursor_num"`
 }
 
 // Dir returns the directory holding the reader's configuration.

@@ -163,12 +163,12 @@ func (m Model) jumpToReference(reference module.Reference) Model {
 func (m Model) confirmReference() Model {
 	reference, ok := module.ParseReference(m.picker.query)
 	if !ok {
-		m.picker.err = "That is not a Reference. Try John 3:16."
+		m.picker.err = m.translate("That is not a Reference. Try John 3:16.")
 		return m
 	}
 	next, ok := m.hop(reference)
 	if !ok {
-		m.picker.err = "No such Reference in the Active translation."
+		m.picker.err = m.translate("No such Reference in the Active translation.")
 		return m
 	}
 	next.picker = choice{}
@@ -255,36 +255,36 @@ func (m Model) pickerRows() int {
 func (m Model) pickerTitle() string {
 	switch m.picker.kind {
 	case pickerBook:
-		return selectBook
+		return m.translate(selectBook)
 	case pickerChapter:
-		return selectChapter
+		return m.translate(selectChapter)
 	case pickerSearch:
-		return searchTitle
+		return m.translate(searchTitle)
 	case pickerHistory:
-		return historyTitle
+		return m.translate(historyTitle)
 	default:
-		return selectTranslation
+		return m.translate(selectTranslation)
 	}
 }
 
 // pickerFilterLabel is the heading of the modal's input line.
 func (m Model) pickerFilterLabel() string {
 	if m.picker.kind == pickerSearch {
-		return searchTitle + ": "
+		return m.translate(searchTitle) + ": "
 	}
-	return "Filter: "
+	return m.translate("Filter: ")
 }
 
 // pickerEmptyMessage explains an empty list, distinguishing "nothing typed yet"
 // from "nothing matched".
 func (m Model) pickerEmptyMessage() string {
 	if m.picker.kind == pickerSearch && m.picker.query == "" {
-		return "Type to search"
+		return m.translate("Type to search")
 	}
 	if m.picker.kind == pickerHistory && len(m.history) == 0 {
-		return "Nothing visited yet"
+		return m.translate("Nothing visited yet")
 	}
-	return "No matches"
+	return m.translate("No matches")
 }
 
 // pickerView is a list modal: a filter line above the matching rows, windowed
@@ -295,27 +295,27 @@ func (m Model) pickerView() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(labelStyle.Render(m.pickerTitle()))
+	b.WriteString(m.styles.label.Render(m.pickerTitle()))
 	b.WriteString("\n\n")
-	b.WriteString(labelStyle.Render(m.pickerFilterLabel()) + m.picker.query)
+	b.WriteString(m.styles.label.Render(m.pickerFilterLabel()) + m.picker.query)
 	b.WriteString("\n\n")
 
 	matches := m.pickerMatches()
 	if len(matches) == 0 {
-		b.WriteString(labelStyle.Render(m.pickerEmptyMessage()))
+		b.WriteString(m.styles.label.Render(m.pickerEmptyMessage()))
 	}
 	rows, start := m.pickerRows(), windowStart(m.picker.cursor, len(matches), m.pickerRows())
 	for i := start; i < len(matches) && i < start+rows; i++ {
 		line := truncate(matches[i].label, m.width-10)
 		if i == m.picker.cursor {
-			b.WriteString(keyStyle.Render("> "+line) + "\n")
+			b.WriteString(m.styles.key.Render("> "+line) + "\n")
 		} else {
 			b.WriteString("  " + line + "\n")
 		}
 	}
-	b.WriteString("\n" + labelStyle.Render(keyEnter+" to select · "+keyClose+" to close"))
+	b.WriteString("\n" + m.styles.label.Render(m.translate(keyEnter+" to select · "+keyClose+" to close")))
 
-	box := helpStyle.Render(strings.TrimRight(b.String(), "\n"))
+	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
@@ -323,18 +323,18 @@ func (m Model) pickerView() string {
 // the reason the last input was rejected.
 func (m Model) referencePickerView() string {
 	var b strings.Builder
-	b.WriteString(labelStyle.Render(selectReference))
+	b.WriteString(m.styles.label.Render(m.translate(selectReference)))
 	b.WriteString("\n\n")
-	b.WriteString(labelStyle.Render("Reference: ") + m.picker.query)
+	b.WriteString(m.styles.label.Render(m.translate("Reference: ")) + m.picker.query)
 	b.WriteString("\n\n")
 	if m.picker.err != "" {
-		b.WriteString(warningStyle.Render(m.picker.err))
+		b.WriteString(m.styles.warning.Render(m.picker.err))
 	} else {
-		b.WriteString(labelStyle.Render("For example: John 3:16"))
+		b.WriteString(m.styles.label.Render(m.translate("For example: John 3:16")))
 	}
-	b.WriteString("\n" + labelStyle.Render(keyEnter+" to go · "+keyClose+" to close"))
+	b.WriteString("\n" + m.styles.label.Render(m.translate(keyEnter+" to go · "+keyClose+" to close")))
 
-	box := helpStyle.Render(b.String())
+	box := m.styles.help.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 

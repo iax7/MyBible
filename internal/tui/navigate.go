@@ -51,11 +51,11 @@ func (m Model) renderLines() chapterLines {
 		if i == m.cursor {
 			out.from = len(out.lines)
 		}
-		for j, line := range strings.Split(renderMarkup(verse.Text), "\n") {
+		for j, line := range strings.Split(m.renderMarkup(verse.Text), "\n") {
 			if j == 0 {
-				style := verseNumStyle
+				style := m.styles.verseNum
 				if i == m.cursor {
-					style = cursorNumStyle
+					style = m.styles.cursorNum
 				}
 				line = style.Render(strconv.Itoa(verse.Number)) + " " + line
 			}

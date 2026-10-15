@@ -18,7 +18,14 @@ func TestLoadReturnsAnEmptyConfigWhenTheFileIsMissing(t *testing.T) {
 
 func TestSaveThenLoadRoundTrips(t *testing.T) {
 	dir := t.TempDir()
-	want := Config{ModuleDir: "/home/me/modules", ActiveTranslation: "RST", LastReference: "John 3:16"}
+	want := Config{
+		ModuleDir:         "/home/me/modules",
+		ActiveTranslation: "RST",
+		LastReference:     "John 3:16",
+		Theme:             "light",
+		Language:          "es",
+		Colors:            Colors{Jesus: "9"},
+	}
 
 	if err := Save(dir, want); err != nil {
 		t.Fatalf("Save: %v", err)
