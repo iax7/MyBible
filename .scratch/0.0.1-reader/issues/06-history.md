@@ -4,10 +4,10 @@
 
 **Blocked by:** 04 (Navigate the Bible).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A navigation jump pushes the previous Reference onto the back stack.
-- [ ] Back and forward move through visited References without duplicating the current one.
-- [ ] Moving the Verse cursor alone does not create a history entry.
-- [ ] `H` opens the History modal listing recent References, most recent first; `Enter` jumps to the chosen Reference.
-- [ ] A TUI-model test performs a sequence of jumps, asserts the history contents and order, and asserts that jumping from the modal reaches the expected Reference.
+- [x] A navigation jump pushes the previous Reference onto the back stack.
+- [x] Back and forward move through visited References without duplicating the current one.
+- [x] Moving the Verse cursor alone does not create a history entry.
+- [x] `H` opens the History modal listing recent References, most recent first; `Enter` jumps to the chosen Reference.
+- [x] A TUI-model test performs a sequence of jumps, asserts the history contents and order, and asserts that jumping from the modal reaches the expected Reference.

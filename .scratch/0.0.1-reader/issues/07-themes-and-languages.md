@@ -4,11 +4,11 @@
 
 **Blocked by:** 03 (Read a Chapter).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A dark theme and a light theme are selectable in config.
-- [ ] Individual theme colors can be overridden in config; the words-of-Jesus red respects the override.
-- [ ] Embedded English and Spanish string maps exist; no i18n framework is used.
-- [ ] Language resolves from config, then the system locale, then English.
-- [ ] The top bar, all modals, the Help modal, and the empty-state message appear fully translated in both languages.
-- [ ] A TUI-model test asserts the rendered view in English and in Spanish for the same state.
+- [x] A dark theme and a light theme are selectable in config.
+- [x] Individual theme colors can be overridden in config; the words-of-Jesus red respects the override.
+- [x] Embedded English and Spanish string maps exist; no i18n framework is used.
+- [x] Language resolves from config, then the system locale, then English.
+- [x] The top bar, all modals, the Help modal, and the empty-state message appear fully translated in both languages.
+- [x] A TUI-model test asserts the rendered view in English and in Spanish for the same state.

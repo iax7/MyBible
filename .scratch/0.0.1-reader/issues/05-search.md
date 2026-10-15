@@ -4,12 +4,12 @@
 
 **Blocked by:** 03 (Read a Chapter).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `/` opens the Search modal; `Esc` closes it.
-- [ ] Search runs against the Active translation only.
-- [ ] Search ignores letter case and accents.
-- [ ] Results are a scrollable list of Reference + snippet, in canonical order.
-- [ ] `Enter` on a result jumps to that Verse and closes the modal.
-- [ ] A search with no matches shows an explicit empty result rather than a blank list.
-- [ ] A TUI-model test asserts that a query returns the expected Reference and that `Enter` jumps to it, using a generated fixture with accented text.
+- [x] `/` opens the Search modal; `Esc` closes it.
+- [x] Search runs against the Active translation only.
+- [x] Search ignores letter case and accents.
+- [x] Results are a scrollable list of Reference + snippet, in canonical order.
+- [x] `Enter` on a result jumps to that Verse and closes the modal.
+- [x] A search with no matches shows an explicit empty result rather than a blank list.
+- [x] A TUI-model test asserts that a query returns the expected Reference and that `Enter` jumps to it, using a generated fixture with accented text.

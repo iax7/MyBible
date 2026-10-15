@@ -4,14 +4,14 @@
 
 **Blocked by:** 01 (Scaffold, CI, and the app shell).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The Module directory is read from config; a missing or unset value shows the empty-state message rather than failing.
-- [ ] The reader scans the Module directory at startup and lists every Bible Module it finds as a Translation.
-- [ ] Each Translation shows the title read from its `info` table.
-- [ ] The "Select Translation" modal is filterable by typing and confirms with `Enter`.
-- [ ] The Active translation is persisted and restored on the next launch.
-- [ ] A corrupt Module, or one missing a required table, is skipped with a warning; the remaining Translations still load.
-- [ ] Module files are opened read-only; a test asserts a Module is byte-identical after the reader opens it.
-- [ ] A TUI-model test picks a Translation from a generated fixture and asserts it becomes active.
-- [ ] A module-reader test asserts that a generated fixture is discovered and its type and title are read correctly.
+- [x] The Module directory is read from config; a missing or unset value shows the empty-state message rather than failing.
+- [x] The reader scans the Module directory at startup and lists every Bible Module it finds as a Translation.
+- [x] Each Translation shows the title read from its `info` table.
+- [x] The "Select Translation" modal is filterable by typing and confirms with `Enter`.
+- [x] The Active translation is persisted and restored on the next launch.
+- [x] A corrupt Module, or one missing a required table, is skipped with a warning; the remaining Translations still load.
+- [x] Module files are opened read-only; a test asserts a Module is byte-identical after the reader opens it.
+- [x] A TUI-model test picks a Translation from a generated fixture and asserts it becomes active.
+- [x] A module-reader test asserts that a generated fixture is discovered and its type and title are read correctly.

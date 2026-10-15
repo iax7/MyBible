@@ -4,14 +4,14 @@
 
 **Blocked by:** 02 (Module directory, discovery, and Translation selection).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The Canonical book list exists with ids matching MyBible's `book_number` scheme, including deuterocanonicals.
-- [ ] A Module's books are mapped into the Canonical book list by `book_number`; absent books respect `is_present`.
-- [ ] Legacy book numbers that changed across format revisions do not break navigation.
-- [ ] Reading renders one Chapter at a time, one Verse per line, with verse numbers.
-- [ ] `<i>` renders as italics and `<J>` renders in the red style.
-- [ ] `<pb/>` and `<br/>` produce paragraph and line breaks; `<S>`, `<m>`, `<f>`, and `<h>` are not shown.
-- [ ] An empty Verse row (a Verse with no text) renders without error.
-- [ ] A module-reader test asserts parsing, book mapping, and markup handling for a generated fixture, including a legacy-numbered one.
-- [ ] A TUI-model test asserts the rendered Chapter content for a generated fixture.
+- [x] The Canonical book list exists with ids matching MyBible's `book_number` scheme, including deuterocanonicals.
+- [x] A Module's books are mapped into the Canonical book list by `book_number`; absent books respect `is_present`.
+- [x] Legacy book numbers that changed across format revisions do not break navigation.
+- [x] Reading renders one Chapter at a time, one Verse per line, with verse numbers.
+- [x] `<i>` renders as italics and `<J>` renders in the red style.
+- [x] `<pb/>` and `<br/>` produce paragraph and line breaks; `<S>`, `<m>`, `<f>`, and `<h>` are not shown.
+- [x] An empty Verse row (a Verse with no text) renders without error.
+- [x] A module-reader test asserts parsing, book mapping, and markup handling for a generated fixture, including a legacy-numbered one.
+- [x] A TUI-model test asserts the rendered Chapter content for a generated fixture.
