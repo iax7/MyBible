@@ -16,7 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Type is the kind of content a Module holds, encoded as a suffix in its file name.
+// Type is a Module type, encoded as a suffix in its file name.
 type Type string
 
 // TypeBible is the Module type holding a complete Bible text; it is the only
@@ -31,7 +31,7 @@ const (
 	tableVerses   = "verses"
 )
 
-// Translation is a Bible Module: one complete Bible text in one language or edition.
+// Translation is a Module of type Bible.
 type Translation struct {
 	Abbreviation string // the file name stem, which exists nowhere inside the Module
 	Title        string // the human title, from info.description

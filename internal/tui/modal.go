@@ -43,16 +43,136 @@ type pickerItem struct {
 	value  int
 }
 
+// pickerSpec is everything that differs between modals: the heading, where the
+// rows come from, what an empty list says, and what confirming a row does. The
+// generic modal code reads this table, so adding a modal is one entry here.
+type pickerSpec struct {
+	title         string                         // interface string key of the heading
+	items         func(m Model) []pickerItem     // the full, unfiltered row list
+	cursor        func(m Model) int              // initial cursor row, or nil for the first
+	onQuery       func(m Model) Model            // extra work when the typed query changes
+	empty         func(m Model) string           // message when no row matches, or nil for the default
+	confirm       func(m Model, value int) Model // apply the highlighted row
+	filter        bool                           // the typed query narrows the rows
+	filterByTitle bool                           // the input line is titled with the modal's own heading
+	freeText      bool                           // the modal edits free text instead of listing rows
+}
+
+// pickers holds one entry per pickerKind, indexed by the kind. pickerNone is the
+// zero entry and is never shown.
+var pickers = [...]pickerSpec{
+	pickerNone: {},
+	pickerTranslation: {
+		title:  selectTranslation,
+		filter: true,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, len(m.translations))
+			for i, t := range m.translations {
+				items = append(items, pickerItem{
+					label:  pad(t.Abbreviation, 8) + t.Title,
+					search: t.Abbreviation + " " + t.Title,
+					value:  i,
+				})
+			}
+			return items
+		},
+		confirm: func(m Model, value int) Model {
+			if value >= 0 && value < len(m.translations) {
+				m.active = m.translations[value].Abbreviation
+				m = m.loadActive()
+				m = m.persist()
+			}
+			return m
+		},
+	},
+	pickerBook: {
+		title:  selectBook,
+		filter: true,
+		items: func(m Model) []pickerItem {
+			books := m.books()
+			items := make([]pickerItem, 0, len(books))
+			for _, b := range books {
+				items = append(items, pickerItem{label: b.Name, search: b.Name, value: b.Number})
+			}
+			return items
+		},
+		cursor:  func(m Model) int { return m.bookIndex(m.book.Number) },
+		confirm: func(m Model, value int) Model { return m.gotoBook(value) },
+	},
+	pickerChapter: {
+		title:  selectChapter,
+		filter: true,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, m.book.Chapters)
+			for chapter := 1; chapter <= m.book.Chapters; chapter++ {
+				items = append(items, pickerItem{label: strconv.Itoa(chapter), search: strconv.Itoa(chapter), value: chapter})
+			}
+			return items
+		},
+		cursor:  func(m Model) int { return m.chapter - 1 },
+		confirm: func(m Model, value int) Model { return m.gotoChapter(value) },
+	},
+	pickerReference: {
+		title:    selectReference,
+		freeText: true,
+	},
+	pickerSearch: {
+		title:         searchTitle,
+		filterByTitle: true,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, len(m.results))
+			for i, result := range m.results {
+				items = append(items, pickerItem{
+					label: result.Reference.String() + "  " + result.Snippet,
+					value: i,
+				})
+			}
+			return items
+		},
+		onQuery: func(m Model) Model {
+			if m.text == nil {
+				m.results = nil
+				return m
+			}
+			m.results = m.text.Search(m.picker.query)
+			return m
+		},
+		empty: func(m Model) string {
+			if m.picker.query == "" {
+				return m.translate("Type to search")
+			}
+			return m.translate("No matches")
+		},
+		confirm: func(m Model, value int) Model { return m.confirmSearch(value) },
+	},
+	pickerHistory: {
+		title:  historyTitle,
+		filter: true,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, len(m.history))
+			for i := len(m.history) - 1; i >= 0; i-- { // most recent first
+				reference := m.history[i].String()
+				items = append(items, pickerItem{label: reference, search: reference, value: i})
+			}
+			return items
+		},
+		empty: func(m Model) string {
+			if len(m.history) == 0 {
+				return m.translate("Nothing visited yet")
+			}
+			return m.translate("No matches")
+		},
+		confirm: func(m Model, value int) Model { return m.jumpToHistory(value) },
+	},
+}
+
 // openPicker starts a modal, preselecting the reader's current position where
 // that makes sense.
 func (m Model) openPicker(kind pickerKind) Model {
 	m.picker = choice{kind: kind}
 	m.results = nil
-	switch kind {
-	case pickerBook:
-		m.picker.cursor = m.bookIndex(m.book.Number)
-	case pickerChapter:
-		m.picker.cursor = m.chapter - 1
+	if cursor := pickers[kind].cursor; cursor != nil {
+		m.picker.cursor = cursor(m)
 	}
 	m.picker.clamp(len(m.pickerMatches()))
 	return m
@@ -91,25 +211,20 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// refreshSearch recomputes the Search modal's hits after its query changes. It
-// does nothing for the other modals.
+// refreshSearch recomputes a modal's rows after its query changes, when its
+// spec asks for it. It does nothing for the other modals.
 func (m Model) refreshSearch() Model {
-	if m.picker.kind != pickerSearch {
-		return m
+	if onQuery := pickers[m.picker.kind].onQuery; onQuery != nil {
+		return onQuery(m)
 	}
-	if m.text == nil {
-		m.results = nil
-		return m
-	}
-	m.results = m.text.Search(m.picker.query)
 	return m
 }
 
 // pickerConfirm applies the modal's current selection and closes it, or reports
 // why the Reference modal's input cannot be used.
 func (m Model) pickerConfirm() Model {
-	kind := m.picker.kind
-	if kind == pickerReference {
+	spec := pickers[m.picker.kind]
+	if spec.freeText {
 		return m.confirmReference()
 	}
 
@@ -119,24 +234,10 @@ func (m Model) pickerConfirm() Model {
 	}
 	value := items[m.picker.cursor].value
 	m.picker = choice{}
-
-	switch kind {
-	case pickerTranslation:
-		if value >= 0 && value < len(m.translations) {
-			m.active = m.translations[value].Abbreviation
-			m = m.loadActive()
-			m = m.persist()
-		}
-	case pickerBook:
-		m = m.gotoBook(value)
-	case pickerChapter:
-		m = m.gotoChapter(value)
-	case pickerSearch:
-		m = m.confirmSearch(value)
-	case pickerHistory:
-		m = m.jumpToHistory(value)
+	if spec.confirm == nil {
+		return m
 	}
-	return m
+	return spec.confirm(m, value)
 }
 
 // confirmSearch jumps to the Search result at index i, closing the modal.
@@ -150,7 +251,7 @@ func (m Model) confirmSearch(i int) Model {
 // jumpToReference jumps and closes the modal only when the Active translation
 // actually contains the Reference, the way the other jumps behave.
 func (m Model) jumpToReference(reference module.Reference) Model {
-	next, ok := m.hop(reference)
+	next, ok := m.jumpAndRecord(reference)
 	if !ok {
 		return m
 	}
@@ -166,7 +267,7 @@ func (m Model) confirmReference() Model {
 		m.picker.err = m.translate("That is not a Reference. Try John 3:16.")
 		return m
 	}
-	next, ok := m.hop(reference)
+	next, ok := m.jumpAndRecord(reference)
 	if !ok {
 		m.picker.err = m.translate("No such Reference in the Active translation.")
 		return m
@@ -177,46 +278,8 @@ func (m Model) confirmReference() Model {
 
 // pickerItems is the full, unfiltered list a modal shows.
 func (m Model) pickerItems() []pickerItem {
-	switch m.picker.kind {
-	case pickerTranslation:
-		items := make([]pickerItem, 0, len(m.translations))
-		for i, t := range m.translations {
-			items = append(items, pickerItem{
-				label:  pad(t.Abbreviation, 8) + t.Title,
-				search: t.Abbreviation + " " + t.Title,
-				value:  i,
-			})
-		}
-		return items
-	case pickerBook:
-		books := m.books()
-		items := make([]pickerItem, 0, len(books))
-		for _, b := range books {
-			items = append(items, pickerItem{label: b.Name, search: b.Name, value: b.Number})
-		}
-		return items
-	case pickerChapter:
-		items := make([]pickerItem, 0, m.book.Chapters)
-		for chapter := 1; chapter <= m.book.Chapters; chapter++ {
-			items = append(items, pickerItem{label: strconv.Itoa(chapter), search: strconv.Itoa(chapter), value: chapter})
-		}
-		return items
-	case pickerSearch:
-		items := make([]pickerItem, 0, len(m.results))
-		for i, result := range m.results {
-			items = append(items, pickerItem{
-				label: result.Reference.String() + "  " + result.Snippet,
-				value: i,
-			})
-		}
-		return items
-	case pickerHistory:
-		items := make([]pickerItem, 0, len(m.history))
-		for i := len(m.history) - 1; i >= 0; i-- { // most recent first
-			reference := m.history[i].String()
-			items = append(items, pickerItem{label: reference, search: reference, value: i})
-		}
-		return items
+	if items := pickers[m.picker.kind].items; items != nil {
+		return items(m)
 	}
 	return nil
 }
@@ -226,7 +289,7 @@ func (m Model) pickerItems() []pickerItem {
 // through unfiltered.
 func (m Model) pickerMatches() []pickerItem {
 	items := m.pickerItems()
-	if m.picker.kind == pickerSearch {
+	if !pickers[m.picker.kind].filter {
 		return items
 	}
 	query := strings.ToLower(m.picker.query)
@@ -253,24 +316,14 @@ func (m Model) pickerRows() int {
 
 // pickerTitle is the heading of the open list modal.
 func (m Model) pickerTitle() string {
-	switch m.picker.kind {
-	case pickerBook:
-		return m.translate(selectBook)
-	case pickerChapter:
-		return m.translate(selectChapter)
-	case pickerSearch:
-		return m.translate(searchTitle)
-	case pickerHistory:
-		return m.translate(historyTitle)
-	default:
-		return m.translate(selectTranslation)
-	}
+	return m.translate(pickers[m.picker.kind].title)
 }
 
 // pickerFilterLabel is the heading of the modal's input line.
 func (m Model) pickerFilterLabel() string {
-	if m.picker.kind == pickerSearch {
-		return m.translate(searchTitle) + ": "
+	spec := pickers[m.picker.kind]
+	if spec.filterByTitle {
+		return m.translate(spec.title) + ": "
 	}
 	return m.translate("Filter: ")
 }
@@ -278,11 +331,8 @@ func (m Model) pickerFilterLabel() string {
 // pickerEmptyMessage explains an empty list, distinguishing "nothing typed yet"
 // from "nothing matched".
 func (m Model) pickerEmptyMessage() string {
-	if m.picker.kind == pickerSearch && m.picker.query == "" {
-		return m.translate("Type to search")
-	}
-	if m.picker.kind == pickerHistory && len(m.history) == 0 {
-		return m.translate("Nothing visited yet")
+	if empty := pickers[m.picker.kind].empty; empty != nil {
+		return empty(m)
 	}
 	return m.translate("No matches")
 }
@@ -290,7 +340,7 @@ func (m Model) pickerEmptyMessage() string {
 // pickerView is a list modal: a filter line above the matching rows, windowed
 // so a long list never overflows the screen, centred on the screen.
 func (m Model) pickerView() string {
-	if m.picker.kind == pickerReference {
+	if pickers[m.picker.kind].freeText {
 		return m.referencePickerView()
 	}
 

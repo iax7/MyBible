@@ -77,7 +77,7 @@ A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, r
 
 **Interface.** The reading pane fills the screen. A top bar shows each command with the key that invokes it, plus the current Reference; it is toggled with `Ctrl-B` and visible by default. Every non-reading action opens a modal (Select Book, Select Chapter, Go to Reference, Select Translation, Search, History, Help). Modal lists are filterable by typing; `Enter` confirms; `Esc` closes. Keymap: `b` Book, `c` Chapter, `v` Go to Reference, `t` Translation, `/` Search, `H` History, `?` Help, `q` Quit; `j`/`k` Verse down/up, `Ctrl-D`/`Ctrl-U` page, `[`/`]` previous/next Chapter, `g`/`G` top/bottom of Chapter, `Ctrl-B` toggle top bar.
 
-**History.** Two related behaviours: a back/forward stack of visited References driven by jumps, and a persisted last-read Reference restored on open. Both live in the XDG data directory.
+**History.** Two related behaviours: a back/forward stack of visited References driven by jumps, and a persisted last-read Reference restored on open. The back/forward stack is kept for the session only; the last-read Reference is persisted in the XDG data directory.
 
 **Configuration.** A TOML config in the XDG config directory holds the Module directory, the Active translation, the interface language, the theme selection, and optional theme color overrides. Interface strings are embedded English and Spanish maps inside the binary, with no i18n framework; language resolves from config, then the system locale, then English.
 

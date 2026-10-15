@@ -69,13 +69,25 @@ func TestHelpOpensAndCloses(t *testing.T) {
 	m := sized(t)
 
 	m, _ = send(t, m, press('?', "?", 0))
-	if got := render(t, m); !strings.Contains(got, "Toggle top bar") {
+	if got := render(t, m); !strings.Contains(got, "Movement") {
 		t.Errorf("help modal did not open\n%s", got)
 	}
 
 	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
-	if got := render(t, m); strings.Contains(got, "Toggle top bar") {
+	if got := render(t, m); strings.Contains(got, "Movement") {
 		t.Errorf("help modal did not close on Esc\n%s", got)
+	}
+}
+
+func TestHelpListsEveryMovementAndCommandKey(t *testing.T) {
+	m, _ := send(t, New(Options{ConfigDir: t.TempDir()}), tea.WindowSizeMsg{Width: 120, Height: 50})
+	m, _ = send(t, m, press('?', "?", 0))
+
+	got := render(t, m)
+	for _, c := range append(append([]Command{}, MovementCommands...), Commands...) {
+		if !strings.Contains(got, pad(c.Key, 10)+c.Label) {
+			t.Errorf("help is missing the keybinding %s %s\n%s", c.Key, c.Label, got)
+		}
 	}
 }
 
@@ -98,7 +110,7 @@ func TestKeysAreIgnoredWhileHelpIsOpen(t *testing.T) {
 	if cmd != nil {
 		t.Error("q acted while the help modal was open")
 	}
-	if got := render(t, m); !strings.Contains(got, "Toggle top bar") {
+	if got := render(t, m); !strings.Contains(got, "Movement") {
 		t.Errorf("help modal closed by an unrelated key\n%s", got)
 	}
 }

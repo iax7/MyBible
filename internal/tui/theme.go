@@ -6,19 +6,9 @@ import (
 	"github.com/iax7/mybible/internal/config"
 )
 
-// Palette is the full set of colors a theme is built from. An empty field means
-// the terminal's default color.
-type Palette struct {
-	Bar       string
-	BarText   string
-	Key       string
-	Label     string
-	Reference string
-	Warning   string
-	Jesus     string
-	VerseNum  string
-	CursorNum string
-}
+// Palette is the full set of colors a theme is built from: field for field the
+// reader's config colors. An empty field means the terminal's default color.
+type Palette = config.Colors
 
 // The built-in themes, selected by name in config.
 var (

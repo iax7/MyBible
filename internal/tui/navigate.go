@@ -31,15 +31,13 @@ func (m Model) chapterVerses() []module.Verse {
 	return m.text.Chapter(m.book.Number, m.chapter)
 }
 
-// bookIndex is the position of a Book in the Active translation, or 0 when it
+// bookIndex is the position of a Book in the Active translation, or -1 when it
 // is not loaded.
 func (m Model) bookIndex(number int) int {
-	for i, b := range m.books() {
-		if b.Number == number {
-			return i
-		}
+	if m.text == nil {
+		return -1
 	}
-	return 0
+	return m.text.BookIndex(number)
 }
 
 // renderLines renders every Verse of the current Chapter, one rendered line per
@@ -142,13 +140,7 @@ func (m Model) moveCursor(delta int) Model { return m.setCursor(m.cursor + delta
 // staying put at the very beginning and end of the Canonical order.
 func (m Model) moveChapter(delta int) Model {
 	books := m.books()
-	i := -1
-	for j, b := range books {
-		if b.Number == m.book.Number {
-			i = j
-			break
-		}
-	}
+	i := m.bookIndex(m.book.Number)
 	if i < 0 {
 		return m
 	}
@@ -156,7 +148,7 @@ func (m Model) moveChapter(delta int) Model {
 	chapter := m.chapter + delta
 	for {
 		if chapter >= 1 && chapter <= books[i].Chapters {
-			next, _ := m.hop(module.Reference{Book: books[i], Chapter: chapter})
+			next, _ := m.jumpAndRecord(module.Reference{Book: books[i], Chapter: chapter})
 			return next
 		}
 		i += delta
@@ -173,13 +165,13 @@ func (m Model) moveChapter(delta int) Model {
 
 // gotoBook points the reader at the first Verse of a Book.
 func (m Model) gotoBook(number int) Model {
-	next, _ := m.hop(module.Reference{Book: module.Book{Number: number}, Chapter: 1})
+	next, _ := m.jumpAndRecord(module.Reference{Book: module.Book{Number: number}, Chapter: 1})
 	return next
 }
 
 // gotoChapter points the reader at the first Verse of a Chapter.
 func (m Model) gotoChapter(chapter int) Model {
-	next, _ := m.hop(module.Reference{Book: m.book, Chapter: chapter})
+	next, _ := m.jumpAndRecord(module.Reference{Book: m.book, Chapter: chapter})
 	return next
 }
 
@@ -211,9 +203,10 @@ func (m Model) jumpTo(reference module.Reference) (Model, bool) {
 	return m.ensureVisible(), true
 }
 
-// hop moves the reader to a Reference as a deliberate jump, recording the move
-// in History. A bare cursor move never calls it, so retracing ignores the cursor.
-func (m Model) hop(reference module.Reference) (Model, bool) {
+// jumpAndRecord moves the reader to a Reference as a deliberate jump, recording
+// the move in History. A bare cursor move never calls it, so retracing ignores
+// the cursor.
+func (m Model) jumpAndRecord(reference module.Reference) (Model, bool) {
 	previous, had := m.currentReference()
 	next, ok := m.jumpTo(reference)
 	if !ok {

@@ -81,7 +81,9 @@ func TestTheCursorKeepsTheCurrentVerseVisible(t *testing.T) {
 }
 
 func TestPageDownAndPageUpMoveWithinTheChapter(t *testing.T) {
-	m := resized(t, navReader(t), 100, 12)
+	// A width wide enough for the top bar to stay on one line, so the pane is
+	// 11 rows and a page is 11 Verses.
+	m := resized(t, navReader(t), 200, 12)
 	m, _ = send(t, m, press('d', "", tea.ModCtrl))
 	if got := render(t, m); !strings.Contains(got, "Genesis 1:12") {
 		t.Errorf("Ctrl-D did not page down\n%s", got)

@@ -27,10 +27,22 @@ var spanish = map[string]string{
 	"Help":           "Ayuda",
 	"Quit":           "Salir",
 	"Keys":           "Teclas",
+	"Movement":       "Movimiento",
+	"Commands":       "Comandos",
 	"Back":           "Atrás",
 	"Forward":        "Adelante",
 	"Toggle top bar": "Mostrar u ocultar la barra",
 	"Close":          "Cerrar",
+
+	// Movement keys, shown in the Help modal.
+	"Verse down":        "Versículo abajo",
+	"Verse up":          "Versículo arriba",
+	"Page down":         "Página abajo",
+	"Page up":           "Página arriba",
+	"Previous Chapter":  "Capítulo anterior",
+	"Next Chapter":      "Capítulo siguiente",
+	"Top of Chapter":    "Inicio del capítulo",
+	"Bottom of Chapter": "Final del capítulo",
 
 	// Modal titles.
 	"Select Translation": "Seleccionar traducción",

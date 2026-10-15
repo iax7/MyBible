@@ -26,8 +26,24 @@ var Commands = []Command{
 	{"t", "Translation"},
 	{"/", "Search"},
 	{"H", "History"},
+	{keyToggleBar, "Toggle top bar"},
+	{keyBack, "Back"},
+	{keyForward, "Forward"},
 	{"?", "Help"},
 	{"q", "Quit"},
+}
+
+// MovementCommands are the keys that move the Verse cursor or the Chapter view,
+// listed in the Help modal apart from the commands.
+var MovementCommands = []Command{
+	{keyVerseDown, "Verse down"},
+	{keyVerseUp, "Verse up"},
+	{keyPageDown, "Page down"},
+	{keyPageUp, "Page up"},
+	{keyPrevChapter, "Previous Chapter"},
+	{keyNextChapter, "Next Chapter"},
+	{keyTop, "Top of Chapter"},
+	{keyBottom, "Bottom of Chapter"},
 }
 
 // Keys that open a modal or a command.
@@ -86,6 +102,19 @@ type Options struct {
 	ModuleDir string
 }
 
+// Reader is the module layer the TUI reads through: the Active translation's
+// Books and Chapters as values, with lookup by Book number and by search term.
+// It is defined here, at its point of use; the module layer implements it.
+type Reader interface {
+	Books() []module.Book
+	Book(number int) (module.Book, bool)
+	BookIndex(number int) int
+	Chapter(number, chapter int) []module.Verse
+	Search(query string) []module.Result
+}
+
+var _ Reader = (*module.Text)(nil) // the module layer's implementation
+
 // Model is the reader's Bubble Tea model.
 type Model struct {
 	width, height int
@@ -102,7 +131,7 @@ type Model struct {
 	lang   lang
 	styles styles
 
-	text    *module.Text
+	text    Reader
 	book    module.Book
 	chapter int
 	cursor  int // index of the current Verse within the Chapter
@@ -143,13 +172,9 @@ func New(opts Options) Model {
 		m.warnings = append(m.warnings, warnings...)
 	}
 
-	if cfg.ActiveTranslation != "" {
-		for _, t := range m.translations {
-			if t.Abbreviation == cfg.ActiveTranslation {
-				m.active = cfg.ActiveTranslation
-				break
-			}
-		}
+	m.active = cfg.ActiveTranslation
+	if _, ok := m.activeTranslation(); !ok {
+		m.active = ""
 	}
 	m = m.loadActive()
 
@@ -383,13 +408,14 @@ func (m Model) activeTranslation() (module.Translation, bool) {
 	return module.Translation{}, false
 }
 
-// barView lists every command with its key, and the current Reference on the right.
+// barView lists every command with its key, and the current Reference. Commands
+// wrap onto extra lines whole, so a label is never split across lines.
 func (m Model) barView() string {
 	parts := make([]string, 0, len(Commands))
 	for _, c := range Commands {
 		parts = append(parts, m.styles.key.Render(c.Key)+" "+m.styles.label.Render(m.translate(c.Label)))
 	}
-	left := strings.Join(parts, "  ")
+	lines := wrapParts(parts, m.width)
 
 	right := emptyReference
 	if reference, ok := m.currentReference(); ok {
@@ -397,23 +423,43 @@ func (m Model) barView() string {
 	}
 	right = m.styles.reference.Render(right)
 
-	// When the commands and the Reference do not fit side by side, the Reference
-	// moves to its own line so neither is silently cut off.
-	if lipgloss.Width(left)+lipgloss.Width(right)+1 > m.width {
+	// The Reference joins the last command line when it fits; otherwise it moves
+	// to its own line so neither is silently cut off.
+	last := len(lines) - 1
+	if lipgloss.Width(lines[last])+lipgloss.Width(right)+1 <= m.width {
+		gap := m.width - lipgloss.Width(lines[last]) - lipgloss.Width(right)
+		lines[last] += strings.Repeat(" ", gap) + right
+	} else {
 		gap := m.width - lipgloss.Width(right)
 		if gap < 0 {
 			gap = 0
 		}
-		return m.styles.bar.Width(m.width).Render(left) + "\n" +
-			m.styles.bar.Width(m.width).Render(strings.Repeat(" ", gap)+right)
+		lines = append(lines, strings.Repeat(" ", gap)+right)
 	}
 
-	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 1 {
-		gap = 1
+	for i, line := range lines {
+		lines[i] = m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
 	}
-	line := left + strings.Repeat(" ", gap) + right
-	return m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
+	return strings.Join(lines, "\n")
+}
+
+// wrapParts lays out command entries on as few lines as fit width, never
+// splitting one entry across lines.
+func wrapParts(parts []string, width int) []string {
+	var lines []string
+	line := ""
+	for _, part := range parts {
+		switch {
+		case line == "":
+			line = part
+		case lipgloss.Width(line)+2+lipgloss.Width(part) <= width:
+			line += "  " + part
+		default:
+			lines = append(lines, line)
+			line = part
+		}
+	}
+	return append(lines, line)
 }
 
 // helpView is the modal listing every keybinding, centred on the screen.
@@ -421,12 +467,14 @@ func (m Model) helpView() string {
 	var b strings.Builder
 	b.WriteString(m.styles.label.Render(m.translate("Keys")))
 	b.WriteString("\n\n")
+	b.WriteString(m.styles.label.Render(m.translate("Movement")) + "\n")
+	for _, c := range MovementCommands {
+		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
+	}
+	b.WriteString("\n" + m.styles.label.Render(m.translate("Commands")) + "\n")
 	for _, c := range Commands {
 		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
 	}
-	b.WriteString(binding(m.styles, keyBack, m.translate("Back")))
-	b.WriteString(binding(m.styles, keyForward, m.translate("Forward")))
-	b.WriteString(binding(m.styles, keyToggleBar, m.translate("Toggle top bar")))
 	b.WriteString(binding(m.styles, keyClose, m.translate("Close")))
 
 	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))

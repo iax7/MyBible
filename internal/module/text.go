@@ -10,6 +10,7 @@ import (
 // navigates and searches this copy, so there are no per-scroll queries.
 type Text struct {
 	books []bookText
+	index map[int]int // Book number -> position in books, so lookup is not a walk
 }
 
 // bookText is one Book of a loaded Translation, with its Chapters indexed by
@@ -98,6 +99,10 @@ func (t Translation) Load() (*Text, error) {
 	sort.Slice(text.books, func(i, j int) bool {
 		return text.books[i].Number < text.books[j].Number
 	})
+	text.index = make(map[int]int, len(text.books))
+	for i, book := range text.books {
+		text.index[book.Number] = i
+	}
 	return text, nil
 }
 
@@ -112,23 +117,29 @@ func (t *Text) Books() []Book {
 
 // Book returns the loaded Book with the given Canonical number.
 func (t *Text) Book(number int) (Book, bool) {
-	for _, b := range t.books {
-		if b.Number == number {
-			return b.Book, true
-		}
+	if i, ok := t.index[number]; ok {
+		return t.books[i].Book, true
 	}
 	return Book{}, false
 }
 
+// BookIndex returns the position of a Book in the loaded Translation's Canonical
+// order, or -1 when it is not loaded.
+func (t *Text) BookIndex(number int) int {
+	if i, ok := t.index[number]; ok {
+		return i
+	}
+	return -1
+}
+
 // Chapter returns the Verses of one Chapter in Verse order.
 func (t *Text) Chapter(number, chapter int) []Verse {
-	for _, b := range t.books {
-		if b.Number == number {
-			if chapter > 0 && chapter < len(b.chapters) {
-				return b.chapters[chapter]
-			}
-			return nil
-		}
+	i, ok := t.index[number]
+	if !ok {
+		return nil
+	}
+	if chapter > 0 && chapter < len(t.books[i].chapters) {
+		return t.books[i].chapters[chapter]
 	}
 	return nil
 }

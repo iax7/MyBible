@@ -48,6 +48,6 @@ func (m Model) jumpToHistory(position int) Model {
 	if position < 0 || position >= len(m.history) {
 		return m
 	}
-	next, _ := m.hop(m.history[position])
+	next, _ := m.jumpAndRecord(m.history[position])
 	return next
 }
