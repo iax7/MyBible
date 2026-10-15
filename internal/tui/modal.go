@@ -20,6 +20,7 @@ const (
 	pickerChapter
 	pickerReference
 	pickerSearch
+	pickerHistory
 )
 
 // choice is the state shared by the modals. The list modals (Translation, Book,
@@ -132,6 +133,8 @@ func (m Model) pickerConfirm() Model {
 		m = m.gotoChapter(value)
 	case pickerSearch:
 		m = m.confirmSearch(value)
+	case pickerHistory:
+		m = m.jumpToHistory(value)
 	}
 	return m
 }
@@ -147,7 +150,7 @@ func (m Model) confirmSearch(i int) Model {
 // jumpToReference jumps and closes the modal only when the Active translation
 // actually contains the Reference, the way the other jumps behave.
 func (m Model) jumpToReference(reference module.Reference) Model {
-	next, ok := m.jumpTo(reference)
+	next, ok := m.hop(reference)
 	if !ok {
 		return m
 	}
@@ -163,7 +166,7 @@ func (m Model) confirmReference() Model {
 		m.picker.err = "That is not a Reference. Try John 3:16."
 		return m
 	}
-	next, ok := m.jumpTo(reference)
+	next, ok := m.hop(reference)
 	if !ok {
 		m.picker.err = "No such Reference in the Active translation."
 		return m
@@ -205,6 +208,13 @@ func (m Model) pickerItems() []pickerItem {
 				label: result.Reference.String() + "  " + result.Snippet,
 				value: i,
 			})
+		}
+		return items
+	case pickerHistory:
+		items := make([]pickerItem, 0, len(m.history))
+		for i := len(m.history) - 1; i >= 0; i-- { // most recent first
+			reference := m.history[i].String()
+			items = append(items, pickerItem{label: reference, search: reference, value: i})
 		}
 		return items
 	}
@@ -250,6 +260,8 @@ func (m Model) pickerTitle() string {
 		return selectChapter
 	case pickerSearch:
 		return searchTitle
+	case pickerHistory:
+		return historyTitle
 	default:
 		return selectTranslation
 	}
@@ -268,6 +280,9 @@ func (m Model) pickerFilterLabel() string {
 func (m Model) pickerEmptyMessage() string {
 	if m.picker.kind == pickerSearch && m.picker.query == "" {
 		return "Type to search"
+	}
+	if m.picker.kind == pickerHistory && len(m.history) == 0 {
+		return "Nothing visited yet"
 	}
 	return "No matches"
 }

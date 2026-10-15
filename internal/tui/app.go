@@ -41,6 +41,7 @@ const (
 	keyReference   = "v"
 	keyTranslation = "t"
 	keySearch      = "/"
+	keyHistory     = "H"
 	keyEnter       = "enter"
 	keyClose       = "esc"
 	keyUp          = "up"
@@ -60,6 +61,12 @@ const (
 	keyBottom      = "G"
 )
 
+// Keys that walk the History. A jump records an entry; these retrace them.
+const (
+	keyBack    = "alt+left"
+	keyForward = "alt+right"
+)
+
 // Modal titles.
 const (
 	selectTranslation = "Select Translation"
@@ -67,6 +74,7 @@ const (
 	selectChapter     = "Select Chapter"
 	selectReference   = "Go to Reference"
 	searchTitle       = "Search"
+	historyTitle      = "History"
 )
 
 const emptyReference = "—"
@@ -111,6 +119,9 @@ type Model struct {
 
 	picker  choice
 	results []module.Result // the Search modal's current hits
+
+	history  []module.Reference // visited References in visit order
+	position int                // index into history of the current Reference
 }
 
 // New returns a Model after loading config and scanning the Module directory.
@@ -216,6 +227,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openPicker(pickerTranslation)
 		case keySearch:
 			m = m.openPicker(pickerSearch)
+		case keyHistory:
+			m = m.openPicker(pickerHistory)
+		case keyBack:
+			m = m.back()
+		case keyForward:
+			m = m.forward()
 		case keyVerseDown:
 			m = m.moveCursor(1)
 		case keyVerseUp:
@@ -409,6 +426,8 @@ func (m Model) helpView() string {
 	for _, c := range Commands {
 		b.WriteString(binding(c.Key, c.Label))
 	}
+	b.WriteString(binding(keyBack, "Back"))
+	b.WriteString(binding(keyForward, "Forward"))
 	b.WriteString(binding(keyToggleBar, "Toggle top bar"))
 	b.WriteString(binding(keyClose, "Close"))
 

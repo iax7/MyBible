@@ -156,8 +156,8 @@ func (m Model) moveChapter(delta int) Model {
 	chapter := m.chapter + delta
 	for {
 		if chapter >= 1 && chapter <= books[i].Chapters {
-			m.book, m.chapter, m.cursor, m.top = books[i], chapter, 0, 0
-			return m
+			next, _ := m.hop(module.Reference{Book: books[i], Chapter: chapter})
+			return next
 		}
 		i += delta
 		if i < 0 || i >= len(books) {
@@ -171,23 +171,16 @@ func (m Model) moveChapter(delta int) Model {
 	}
 }
 
-// gotoBook points the reader at the first Chapter of a Book.
+// gotoBook points the reader at the first Verse of a Book.
 func (m Model) gotoBook(number int) Model {
-	book, ok := m.text.Book(number)
-	if !ok {
-		return m
-	}
-	m.book, m.chapter, m.cursor, m.top = book, 1, 0, 0
-	return m
+	next, _ := m.hop(module.Reference{Book: module.Book{Number: number}, Chapter: 1})
+	return next
 }
 
 // gotoChapter points the reader at the first Verse of a Chapter.
 func (m Model) gotoChapter(chapter int) Model {
-	if chapter < 1 || chapter > m.book.Chapters {
-		return m
-	}
-	m.chapter, m.cursor, m.top = chapter, 0, 0
-	return m
+	next, _ := m.hop(module.Reference{Book: m.book, Chapter: chapter})
+	return next
 }
 
 // jumpTo points the reader at a Reference, reporting whether the Active
@@ -216,4 +209,18 @@ func (m Model) jumpTo(reference module.Reference) (Model, bool) {
 	}
 	m.book, m.chapter, m.cursor, m.top = book, reference.Chapter, cursor, 0
 	return m.ensureVisible(), true
+}
+
+// hop moves the reader to a Reference as a deliberate jump, recording the move
+// in History. A bare cursor move never calls it, so retracing ignores the cursor.
+func (m Model) hop(reference module.Reference) (Model, bool) {
+	previous, had := m.currentReference()
+	next, ok := m.jumpTo(reference)
+	if !ok {
+		return m, false
+	}
+	if had {
+		next = next.recordHistory(previous)
+	}
+	return next, true
 }
