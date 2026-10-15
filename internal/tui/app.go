@@ -2,6 +2,8 @@
 package tui
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -49,12 +51,15 @@ const selectTranslation = "Select Translation"
 const emptyReference = "—"
 
 var (
-	barStyle     = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252"))
-	keyStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	labelStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	refStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
-	warningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	helpStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 3)
+	barStyle      = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252"))
+	keyStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	labelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	refStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
+	warningStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	helpStyle     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 3)
+	italicsStyle  = lipgloss.NewStyle().Italic(true)
+	jesusStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	verseNumStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 )
 
 // Options configures where the reader finds its state. Empty fields fall back
@@ -76,6 +81,10 @@ type Model struct {
 	translations []module.Translation
 	active       string
 	warnings     []string
+
+	text    *module.Text
+	book    module.Book
+	chapter int
 
 	picker choice
 }
@@ -119,6 +128,27 @@ func New(opts Options) Model {
 				break
 			}
 		}
+	}
+	return m.loadActive()
+}
+
+// loadActive loads the Active translation's whole text into memory and points
+// the reader at its first Chapter. A load failure is a warning, not a crash.
+func (m Model) loadActive() Model {
+	m.text, m.book, m.chapter, m.reference = nil, module.Book{}, 0, ""
+	t, ok := m.activeTranslation()
+	if !ok {
+		return m
+	}
+	text, err := t.Load()
+	if err != nil {
+		m.warnings = append(m.warnings, fmt.Sprintf("%s: %v", t.Abbreviation, err))
+		return m
+	}
+	m.text = text
+	if books := text.Books(); len(books) > 0 {
+		m.book, m.chapter = books[0], 1
+		m.reference = fmt.Sprintf("%s %d", m.book.Name, m.chapter)
 	}
 	return m
 }
@@ -170,6 +200,7 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if t, ok := m.selectedTranslation(); ok {
 			m.active = t.Abbreviation
 			m.picker = choice{}
+			m = m.loadActive()
 			m = m.persist()
 		}
 	case keyBackspace:
@@ -237,8 +268,8 @@ func (m Model) readerView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, bar, pane)
 }
 
-// paneContent is the reading pane. Ticket 03 replaces the Active translation
-// stub with the Chapter; for now it explains the state of the Module directory.
+// paneContent is the reading pane: the current Chapter when a Translation is
+// loaded, otherwise an explanation of the state of the Module directory.
 func (m Model) paneContent() string {
 	var b strings.Builder
 	switch {
@@ -252,6 +283,8 @@ func (m Model) paneContent() string {
 	case m.active == "":
 		b.WriteString("No Active translation.\n\n")
 		b.WriteString("Press " + keyTranslation + " to choose one.")
+	case m.book.Number != 0:
+		b.WriteString(m.chapterView())
 	default:
 		t, _ := m.activeTranslation()
 		b.WriteString(t.Title + "\n\n")
@@ -261,6 +294,44 @@ func (m Model) paneContent() string {
 		b.WriteString("\n\n" + warningStyle.Render("warning: "+warning))
 	}
 	return b.String()
+}
+
+// chapterView renders the current Chapter: one Verse per line, each with its
+// number, keeping paragraph and line breaks.
+func (m Model) chapterView() string {
+	verses := m.text.Chapter(m.book.Number, m.chapter)
+	var b strings.Builder
+	for i, verse := range verses {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(verseNumStyle.Render(strconv.Itoa(verse.Number)))
+		b.WriteString(" ")
+		b.WriteString(renderMarkup(verse.Text))
+	}
+	return b.String()
+}
+
+// renderMarkup renders a Verse's inline markup in the supported subset.
+func renderMarkup(text string) string {
+	var b strings.Builder
+	for _, run := range module.ParseMarkup(text) {
+		b.WriteString(runStyle(run).Render(run.Text))
+	}
+	return b.String()
+}
+
+// runStyle is the display style for one Run of Verse text.
+func runStyle(run module.Run) lipgloss.Style {
+	switch {
+	case run.Red && run.Italics:
+		return jesusStyle.Italic(true)
+	case run.Red:
+		return jesusStyle
+	case run.Italics:
+		return italicsStyle
+	}
+	return lipgloss.NewStyle()
 }
 
 // pickerView is the Select Translation modal: a filter line above the matching
