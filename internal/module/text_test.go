@@ -96,6 +96,9 @@ func TestLoadMapsModuleBooksIntoTheCanonicalList(t *testing.T) {
 	if !ok || genesis.Name != "Genesis" {
 		t.Errorf("Book(10) = %+v, %v; want the canonical Genesis", genesis, ok)
 	}
+	if genesis.ShortName != "Gen" || genesis.LongName != "Genesis" {
+		t.Errorf("Book(10) lost the Module's own names: %+v", genesis)
+	}
 	if genesis.Chapters != 2 {
 		t.Errorf("Genesis has %d Chapters, want 2", genesis.Chapters)
 	}

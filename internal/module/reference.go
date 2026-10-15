@@ -18,11 +18,19 @@ func (r Reference) String() string {
 	return fmt.Sprintf("%s %d:%d", r.Book.Name, r.Chapter, r.Verse)
 }
 
-// ParseReference parses "John 3:16", "John 3", or "1 Samuel 3:16". The Book name
-// is matched case-insensitively against the Canonical book list; a missing Verse
-// defaults to 1. Anything else is rejected.
+// ParseReference parses "John 3:16", "John 3", or "John". The Book name is
+// matched case-insensitively against the Canonical book list; a missing Chapter
+// or Verse defaults to 1. Anything else is rejected. A Book named the way a
+// Module itself names it is not known here: a caller holding a loaded
+// Translation resolves that name first and passes the Canonical one.
 func ParseReference(text string) (Reference, bool) {
-	book, location, ok := splitReference(strings.TrimSpace(text))
+	text = strings.TrimSpace(text)
+	for _, b := range CanonicalBooks {
+		if strings.EqualFold(b.Name, text) { // a Book on its own: its first Verse
+			return Reference{Book: b, Chapter: 1, Verse: 1}, true
+		}
+	}
+	book, location, ok := splitReference(text)
 	if !ok {
 		return Reference{}, false
 	}

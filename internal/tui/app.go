@@ -69,6 +69,7 @@ const (
 	keySearch      = "/"
 	keyHistory     = "H"
 	keyEnter       = "enter"
+	keyTab         = "tab"
 	keyClose       = "esc"
 	keyUp          = "up"
 	keyDown        = "down"

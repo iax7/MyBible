@@ -170,12 +170,161 @@ func TestTheReferencePickerJumpsToAVerse(t *testing.T) {
 	}
 }
 
+// The modal lists nothing until the input names a Book: listing them all is what
+// b does.
+func TestTheReferencePickerListsTheBooksTheInputNames(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	if got := render(t, m); strings.Contains(got, "Genesis") || strings.Contains(got, "Exodus") {
+		t.Fatalf("v listed every Book before anything was typed\n%s", got)
+	}
+
+	m = typeKey(t, m, "exo")
+	got := render(t, m)
+	if strings.Contains(got, "Genesis") {
+		t.Errorf("the Book list kept a Book the input does not name\n%s", got)
+	}
+	if !strings.Contains(got, "Exodus") {
+		t.Errorf("the Book list does not show the Book the input names\n%s", got)
+	}
+}
+
+func TestTheReferencePickerCompletesWithTab(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "exo")
+	m, _ = send(t, m, press(tea.KeyTab, "", 0))
+
+	// The trailing space keeps the Chapter off the Book's name.
+	if got := render(t, m); !strings.Contains(got, "Reference: Exodus ") {
+		t.Fatalf("Tab did not write the highlighted Book into the input\n%s", got)
+	}
+
+	m = typeKey(t, m, "2:2")
+	if got := render(t, m); !strings.Contains(got, "Reference: Exodus 2:2") {
+		t.Fatalf("the Chapter typed after Tab did not land beside the Book's name\n%s", got)
+	}
+
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	if got := on(m); got != "Exodus 2:2" {
+		t.Errorf("the completed Reference did not jump, the reader is on %q", got)
+	}
+}
+
+func TestTabKeepsTheChapterAlreadyTyped(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "exo 2:2")
+	m, _ = send(t, m, press(tea.KeyTab, "", 0))
+
+	if got := render(t, m); !strings.Contains(got, "Reference: Exodus 2:2") {
+		t.Fatalf("Tab lost the Chapter:Verse already typed\n%s", got)
+	}
+
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	if got := on(m); got != "Exodus 2:2" {
+		t.Errorf("the completed Reference did not jump, the reader is on %q", got)
+	}
+}
+
+func TestTheReferencePickerTakesABookOnItsOwn(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "Exodus")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := on(m); got != "Exodus 1:1" {
+		t.Errorf("a Book on its own did not jump to Chapter 1, Verse 1, the reader is on %q", got)
+	}
+}
+
+func TestTheReferencePickerTakesAChapterWithoutAVerse(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "Exodus 2")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := on(m); got != "Exodus 2:1" {
+		t.Errorf("a Chapter without a Verse did not jump to Verse 1, the reader is on %q", got)
+	}
+}
+
+// A Book the Module names itself — "Gen" is the fixture's short name for
+// Genesis — is resolved when a single Book answers to it.
+func TestTheReferencePickerTakesTheModulesOwnBookName(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "Gen 2")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := on(m); got != "Genesis 2:1" {
+		t.Errorf("the Module's own Book name was not resolved, the reader is on %q", got)
+	}
+}
+
+// An input naming no Book is read as the translation's first Book.
+func TestTheReferencePickerTakesTheFirstBookWhenTheInputNamesNone(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press(']', "]", 0)) // away from Genesis 1:1
+	m, _ = send(t, m, press('v', "v", 0))
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("an empty input did not read as the first Book, the reader is on %q", got)
+	}
+
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "2:2")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	if got := on(m); got != "Genesis 2:2" {
+		t.Errorf("a Chapter:Verse with no Book did not read as the first Book's, the reader is on %q", got)
+	}
+}
+
+// Enter never guesses from the list: a name no Book has to answer to, even a
+// prefix the list would have shown, is rejected. Tab is the way to complete it.
+func TestTheReferencePickerDoesNotGuessAPrefix(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "Ex")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := render(t, m); !strings.Contains(got, "not a Reference") {
+		t.Errorf("a Book name the translation does not have was not rejected\n%s", got)
+	}
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("the reader moved after a rejected input, it is on %q", got)
+	}
+}
+
+// Two Books claiming the same Module name is no name at all: the reader reports
+// it rather than picking one.
+func TestTheReferencePickerRejectsAnAmbiguousModulesOwnName(t *testing.T) {
+	info, books, verses := navFixture()
+	for i := range books {
+		books[i].ShortName = "Xx"
+	}
+	m := activeReader(t, info, books, verses)
+
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "Xx 2")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := render(t, m); !strings.Contains(got, "not a Reference") {
+		t.Errorf("a Book name two Books answer to was not rejected\n%s", got)
+	}
+}
+
 func TestTheReferencePickerRejectsMalformedInput(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
 	m = typeKey(t, m, "banana")
-	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	m, _ = send(t, m, press(tea.KeyTab, "", 0)) // no row to complete from
+	if got := render(t, m); !strings.Contains(got, "Reference: banana") {
+		t.Errorf("Tab changed the input though no Book matched it\n%s", got)
+	}
 
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
 	if got := render(t, m); !strings.Contains(got, "not a Reference") {
 		t.Errorf("malformed input was not rejected\n%s", got)
 	}

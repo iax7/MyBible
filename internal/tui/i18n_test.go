@@ -106,6 +106,7 @@ func TestTheHelpModalReadsInBothLanguages(t *testing.T) {
 func TestTheModalEmptyMessagesReadInBothLanguages(t *testing.T) {
 	assertSameState(t, []tea.KeyPressMsg{press('/', "/", 0)}, "Type to search", "Escribe para buscar")
 	assertSameState(t, []tea.KeyPressMsg{press('H', "H", 0)}, "Nothing visited yet", "Aún no has visitado nada")
+	assertSameState(t, []tea.KeyPressMsg{press('v', "v", 0)}, "enter to go", "enter para ir")
 
 	noMatch := []tea.KeyPressMsg{press('/', "/", 0), press('z', "z", 0)}
 	assertSameState(t, noMatch, "No matches", "Sin resultados")

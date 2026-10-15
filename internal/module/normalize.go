@@ -7,9 +7,9 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// normalize lowercases text and strips accents, so Search ignores letter case
-// and diacritics (jesus finds Jesús). Text is normalized once, at load time.
-func normalize(text string) string {
+// Normalize lowercases text and strips accents, so a query ignores letter case
+// and diacritics (jesus finds Jesús, and a Module's Génesis answers to genesis).
+func Normalize(text string) string {
 	decomposed := norm.NFD.String(strings.ToLower(text))
 	var b strings.Builder
 	b.Grow(len(decomposed))

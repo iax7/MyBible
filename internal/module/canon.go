@@ -1,12 +1,47 @@
 package module
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // Book is one entry in the Canonical book list.
 type Book struct {
 	Number   int    // MyBible's book_number, stable across the reader
 	Name     string // the reader's own name, so naming is the same in every Translation
 	Chapters int    // Chapters present in a loaded Translation; 0 in the Canonical list
+
+	// ShortName and LongName are the names the Module itself uses for the Book,
+	// filled only in a loaded Translation. The reader never shows them: they
+	// widen what an input accepts, so a Module's own naming — and its language —
+	// can name a Book without changing what the interface calls it.
+	ShortName string
+	LongName  string
+}
+
+// Names is every name the Book answers to: the reader's own, then the Module's
+// own when the Translation is loaded. Matching an input goes through all of
+// them; the interface shows only the first.
+func (b Book) Names() []string {
+	names := []string{b.Name}
+	for _, name := range []string{b.ShortName, b.LongName} {
+		if name != "" && name != b.Name {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// Named reports whether text is one of the Book's names, ignoring letter case
+// and accents.
+func (b Book) Named(text string) bool {
+	text = Normalize(strings.TrimSpace(text))
+	for _, name := range b.Names() {
+		if Normalize(name) == text {
+			return true
+		}
+	}
+	return false
 }
 
 // CanonicalBooks is the reader's built-in ordered list of Bible Books: the 66

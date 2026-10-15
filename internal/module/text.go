@@ -45,7 +45,7 @@ func (t Translation) Load() (*Text, error) {
 	if err != nil {
 		return nil, err
 	}
-	present, err := presentBookNumbers(db, tables)
+	books, err := moduleBooks(db, tables)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +64,8 @@ func (t Translation) Load() (*Text, error) {
 		if err := rows.Scan(&bookNumber, &chapter, &verse.Number, &text); err != nil {
 			return nil, err
 		}
-		book, ok := canonicalBook(bookNumber)
-		if !ok || !present[book.Number] || chapter < 1 {
+		book, ok := books[bookNumber]
+		if !ok || chapter < 1 {
 			continue
 		}
 		entry := byNumber[book.Number]
@@ -144,15 +144,16 @@ func (t *Text) Chapter(number, chapter int) []Verse {
 	return nil
 }
 
-// presentBookNumbers reads the Module's book table and returns the Canonical
-// numbers of the Books it marks present. books_all carries is_present; a book
+// moduleBooks reads the Module's book table and returns the Canonical Books it
+// holds, keyed by the book_number the Module writes them under, each carrying
+// the Module's own short and long names. books_all carries is_present; a book
 // table without it lists only present Books.
-func presentBookNumbers(db *sql.DB, tables map[string]bool) (map[int]bool, error) {
+func moduleBooks(db *sql.DB, tables map[string]bool) (map[int]Book, error) {
 	table, presence := tableBooks, false
 	if tables[tableBooksAll] {
 		table, presence = tableBooksAll, true
 	}
-	columns := "book_number"
+	columns := "book_number, short_name, long_name"
 	if presence {
 		columns += ", is_present"
 	}
@@ -163,25 +164,29 @@ func presentBookNumbers(db *sql.DB, tables map[string]bool) (map[int]bool, error
 	}
 	defer func() { _ = rows.Close() }()
 
-	present := make(map[int]bool)
+	books := make(map[int]Book)
 	for rows.Next() {
 		var number int
+		var short, long sql.NullString
 		if presence {
 			var isPresent sql.NullBool
-			if err := rows.Scan(&number, &isPresent); err != nil {
+			if err := rows.Scan(&number, &short, &long, &isPresent); err != nil {
 				return nil, err
 			}
 			if !isPresent.Valid || !isPresent.Bool {
 				continue
 			}
-		} else if err := rows.Scan(&number); err != nil {
+		} else if err := rows.Scan(&number, &short, &long); err != nil {
 			return nil, err
 		}
-		if book, ok := canonicalBook(number); ok {
-			present[book.Number] = true
+		book, ok := canonicalBook(number)
+		if !ok {
+			continue
 		}
+		book.ShortName, book.LongName = short.String, long.String
+		books[number] = book
 	}
-	return present, rows.Err()
+	return books, rows.Err()
 }
 
 // Run is a stretch of Verse text sharing one display style. A break tag becomes

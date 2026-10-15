@@ -12,6 +12,41 @@ func TestEveryCanonicalBookHasAClassification(t *testing.T) {
 	}
 }
 
+func TestBookNamed(t *testing.T) {
+	genesis := Book{Number: 10, Name: "Genesis", ShortName: "Gn", LongName: "Génesis"}
+	cases := []struct {
+		text string
+		want bool
+	}{
+		{"Genesis", true},  // the reader's own name
+		{"genesis", true},  // letter case is ignored
+		{"Gn", true},       // the Module's short name
+		{"Génesis", true},  // the Module's long name
+		{"GENESIS", true},  // ...
+		{"genesis ", true}, // the input is trimmed
+		{"génesis", true},  // accents are ignored on both sides
+		{"Gen", false},     // a prefix of a name is not a name
+		{"John", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := genesis.Named(c.text); got != c.want {
+			t.Errorf("Book.Named(%q) = %v, want %v", c.text, got, c.want)
+		}
+	}
+}
+
+func TestBookNamesFallsBackToTheCanonicalName(t *testing.T) {
+	canonical := Book{Number: 500, Name: "John"} // a Canonical Book carries no Module names
+	if got := canonical.Names(); len(got) != 1 || got[0] != "John" {
+		t.Errorf("Canonical Book.Names() = %v, want just the reader's own name", got)
+	}
+	named := Book{Number: 10, Name: "Genesis", ShortName: "Gen", LongName: "Genesis"}
+	if got := named.Names(); len(got) != 2 || got[1] != "Gen" {
+		t.Errorf("Book.Names() = %v, want the two names it has, with no repetition", got)
+	}
+}
+
 func TestClassificationOf(t *testing.T) {
 	cases := []struct {
 		number int

@@ -42,7 +42,7 @@ func (t *Text) Search(query string) []Result {
 // searchable is the form Search matches against: display text normalized and
 // with runs of whitespace collapsed to single spaces.
 func searchable(text string) string {
-	return normalize(collapse(displayText(text)))
+	return Normalize(collapse(displayText(text)))
 }
 
 // displayText is a Verse's text as the reader shows it, with inline markup
@@ -99,7 +99,7 @@ func matchIndex(display []rune, query string) int {
 	normalized := make([]rune, 0, len(display))
 	positions := make([]int, 0, len(display))
 	for i, r := range display {
-		for _, n := range normalize(string(r)) {
+		for _, n := range Normalize(string(r)) {
 			normalized = append(normalized, n)
 			positions = append(positions, i)
 		}

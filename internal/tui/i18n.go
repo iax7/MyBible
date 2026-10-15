@@ -51,15 +51,15 @@ var spanish = map[string]string{
 	"Go to Reference":    "Ir a la referencia",
 
 	// Modal bodies.
-	"Filter: ":                                     "Filtro: ",
-	"Type to search":                               "Escribe para buscar",
-	"Nothing visited yet":                          "Aún no has visitado nada",
-	"No matches":                                   "Sin resultados",
-	"enter to select · esc to close":               "enter para seleccionar · esc para cerrar",
-	"Reference: ":                                  "Referencia: ",
-	"For example: John 3:16":                       "Por ejemplo: Juan 3:16",
-	"enter to go · esc to close":                   "enter para ir · esc para cerrar",
-	"That is not a Reference. Try John 3:16.":      "Eso no es una referencia. Prueba con Juan 3:16.",
+	"Filter: ":                             "Filtro: ",
+	"Type to search":                       "Escribe para buscar",
+	"Nothing visited yet":                  "Aún no has visitado nada",
+	"No matches":                           "Sin resultados",
+	"enter to select · esc to close":       "enter para seleccionar · esc para cerrar",
+	"Reference: ":                          "Referencia: ",
+	"For example: John, John 3, John 3:16": "Por ejemplo: John, John 3, John 3:16",
+	"enter to go · tab to complete · esc to close": "enter para ir · tab para completar · esc para cerrar",
+	"That is not a Reference. Try John 3:16.":      "Eso no es una referencia. Prueba con John 3:16.",
 	"No such Reference in the Active translation.": "Esa referencia no existe en la traducción activa.",
 
 	// Empty states and warnings.
