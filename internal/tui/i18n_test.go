@@ -22,8 +22,9 @@ func localized(t *testing.T, language string) Model {
 	return configured(t, config.Config{ModuleDir: dir, ActiveTranslation: "RST", Language: language})
 }
 
-// configured builds a reader over the given config. An empty Module directory
-// is how the empty state and the system-locale fallback are read.
+// configured builds a reader over the given config. A config that names no
+// Module directory leaves the reader on its default one, which is empty unless
+// a test fills it.
 func configured(t *testing.T, cfg config.Config) Model {
 	t.Helper()
 	configDir := t.TempDir()
@@ -31,6 +32,14 @@ func configured(t *testing.T, cfg config.Config) Model {
 		t.Fatalf("Save: %v", err)
 	}
 	return newReader(t, configDir, cfg.ModuleDir)
+}
+
+// withoutDataDir removes every way the reader could reach a default Module
+// directory, the only route left into the "not configured" state.
+func withoutDataDir(t *testing.T) {
+	t.Helper()
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "")
 }
 
 // assertSameState reaches one state in both languages and checks that the
@@ -103,6 +112,8 @@ func TestTheModalEmptyMessagesReadInBothLanguages(t *testing.T) {
 }
 
 func TestTheEmptyStateReadsInBothLanguages(t *testing.T) {
+	withoutDataDir(t)
+
 	en := render(t, configured(t, config.Config{Language: "en"}))
 	if !strings.Contains(en, "No Module directory configured.") {
 		t.Errorf("the English empty state is missing its message\n%s", en)
@@ -140,7 +151,7 @@ func TestLanguageFallsBackToTheSystemLocale(t *testing.T) {
 	t.Setenv("LANG", "es_ES.UTF-8")
 
 	got := render(t, configured(t, config.Config{}))
-	if !strings.Contains(got, "No hay un directorio de módulos configurado.") {
+	if !strings.Contains(got, "Libro") {
 		t.Errorf("the system locale did not select Spanish\n%s", got)
 	}
 }
@@ -151,7 +162,7 @@ func TestLanguageFallsBackToEnglish(t *testing.T) {
 	t.Setenv("LANG", "fr_FR.UTF-8")
 
 	got := render(t, configured(t, config.Config{}))
-	if !strings.Contains(got, "No Module directory configured.") {
+	if !strings.Contains(got, "Book") {
 		t.Errorf("an unknown locale did not fall back to English\n%s", got)
 	}
 }

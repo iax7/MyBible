@@ -96,7 +96,8 @@ const (
 const emptyReference = "—"
 
 // Options configures where the reader finds its state. Empty fields fall back
-// to the XDG config directory and to the Module directory named in config.
+// to the XDG config directory and to the Module directory named in config, and
+// then to the reader's default data directory.
 type Options struct {
 	ConfigDir string
 	ModuleDir string
@@ -165,6 +166,14 @@ func New(opts Options) Model {
 	m.moduleDir = opts.ModuleDir
 	if m.moduleDir == "" {
 		m.moduleDir = cfg.ModuleDir
+	}
+	if m.moduleDir == "" {
+		// Without a folder of its own the reader falls back to the default, so
+		// Modules work before anything is configured. The pane explains the
+		// state when even that cannot be resolved.
+		if dir, err := config.DefaultModuleDir(); err == nil {
+			m.moduleDir = dir
+		}
 	}
 	if m.moduleDir != "" {
 		translations, warnings := module.Discover(m.moduleDir)

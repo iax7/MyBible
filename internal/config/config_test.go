@@ -50,6 +50,33 @@ func TestLoadReportsAMalformedConfig(t *testing.T) {
 	}
 }
 
+func TestDefaultModuleDirFollowsTheXDGDataHome(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", base)
+
+	got, err := DefaultModuleDir()
+	if err != nil {
+		t.Fatalf("DefaultModuleDir: %v", err)
+	}
+	if want := filepath.Join(base, "mybible"); got != want {
+		t.Errorf("DefaultModuleDir = %q, want %q", got, want)
+	}
+}
+
+func TestDefaultModuleDirIgnoresARelativeDataHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", "relative/to/nowhere") // invalid: the XDG spec ignores relative paths
+	t.Setenv("HOME", home)
+
+	got, err := DefaultModuleDir()
+	if err != nil {
+		t.Fatalf("DefaultModuleDir: %v", err)
+	}
+	if want := filepath.Join(home, ".local", "share", "mybible"); got != want {
+		t.Errorf("DefaultModuleDir = %q, want %q", got, want)
+	}
+}
+
 func TestDirFollowsTheXDGConfigHome(t *testing.T) {
 	base := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", base)

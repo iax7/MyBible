@@ -29,10 +29,20 @@ func typeKey(t *testing.T, m Model, text string) Model {
 	return m
 }
 
-func TestMissingModuleDirectoryShowsHowToConfigureIt(t *testing.T) {
-	got := render(t, newReader(t, t.TempDir(), ""))
-	if !strings.Contains(got, "module_directory") {
-		t.Errorf("empty state does not explain how to set the Module directory\n%s", got)
+func TestTheDefaultModuleDirectoryIsUsedWhenConfigNamesNone(t *testing.T) {
+	dataHome := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	dir := filepath.Join(dataHome, "mybible")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	modtest.Bible(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"})
+
+	m := newReader(t, t.TempDir(), "")
+	m, _ = send(t, m, press('t', "t", 0))
+
+	if got := render(t, m); !strings.Contains(got, "Reina-Valera 1909") {
+		t.Errorf("the default Module directory was not scanned\n%s", got)
 	}
 }
 

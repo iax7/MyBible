@@ -36,9 +36,11 @@ go build ./cmd/mybible
 
 ## Modules
 
-Point the reader at the folder holding your MyBible modules. Module files are opened
-read-only and are never modified or copied. Module content is mixed-license and mostly
-not redistributable, so no module file belongs in this repository.
+Modules live in `~/.local/share/mybible` (or `$XDG_DATA_HOME/mybible` when set).
+Drop your `.SQLite3` files there and the reader finds them at startup. To read them
+from somewhere else, set `module_directory` in the config file. Module files are
+opened read-only and are never modified or copied. Module content is mixed-license
+and mostly not redistributable, so no module file belongs in this repository.
 
 ## License
 

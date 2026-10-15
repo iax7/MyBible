@@ -57,6 +57,28 @@ func Path(dir string) string {
 	return filepath.Join(dir, fileName)
 }
 
+// DefaultModuleDir returns the folder the reader scans for Modules when config
+// names none: the reader's data directory. Modules are user data rather than
+// configuration, so they default under XDG_DATA_HOME, not beside config.toml.
+//
+// os has no UserDataDir, so the XDG rule is spelled out here: a relative
+// XDG_DATA_HOME is invalid and ignored, the way os.UserConfigDir treats it.
+//
+// shortcut: Modules sit in the root of the data directory, sharing it with any
+// state the reader stores there later; move them into a subdirectory when the
+// reader grows data files of its own.
+func DefaultModuleDir() (string, error) {
+	base := os.Getenv("XDG_DATA_HOME")
+	if !filepath.IsAbs(base) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		base = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(base, appDir), nil
+}
+
 // Load reads the config from dir. A missing file yields a zero Config and no
 // error, so the reader starts on defaults the first time it runs.
 func Load(dir string) (Config, error) {

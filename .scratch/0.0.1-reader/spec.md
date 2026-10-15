@@ -8,11 +8,11 @@ I read the Bible on Android with MyBible and I already have a library of MyBible
 
 ## Solution
 
-A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, read-only** — no import, no second copy, no new library to maintain. I point it at my module folder once; it lists the Translations it finds, remembers my Active translation, and lets me read (Book → Chapter → Verse), jump anywhere through filterable modals, search the active text, and retrace my steps with back/forward history. It ships as a single static binary under the MIT license, starting at version 0.0.1.
+A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, read-only** — no import, no second copy, no new library to maintain. Modules are read from a default folder, so it works the moment it is dropped in, with config to point it elsewhere; it lists the Translations it finds, remembers my Active translation, and lets me read (Book → Chapter → Verse), jump anywhere through filterable modals, search the active text, and retrace my steps with back/forward history. It ships as a single static binary under the MIT license, starting at version 0.0.1.
 
 ## User Stories
 
-1. As a reader, I want to configure the Module directory once, so that the reader can see the MyBible modules I already have.
+1. As a reader, I want a Module directory that works without setup, so that I can start reading the MyBible modules I already have.
 2. As a reader, I want the reader to scan the Module directory at startup, so that new modules I drop in are picked up without extra setup.
 3. As a reader, I want to see the list of discovered Translations, so that I can pick the one I want to read.
 4. As a reader, I want to switch the Active translation from a modal, so that I can compare editions without leaving the reader.
@@ -54,7 +54,7 @@ A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, r
 40. As a reader, I want a corrupt or incomplete module skipped with a visible warning, so that one bad file does not stop me reading with the others.
 41. As a reader, I want the reader to work fully offline, so that reading never depends on a network.
 42. As a reader, I want a single static binary with no runtime dependencies, so that I can drop it anywhere and run it.
-43. As a reader, when no modules are found, I want a clear message telling me how to set the Module directory, so that I am not stuck at an empty screen.
+43. As a reader, when no modules are found, I want a clear message naming where the reader looked and how to point it elsewhere, so that I am not stuck at an empty screen.
 44. As a maintainer, I want the version to start at 0.0.1 with no public releases yet, so that the format and UX can settle before anyone depends on them.
 45. As a maintainer, I want continuous integration running build, tests, and lint, so that the code stays green as it grows.
 46. As a maintainer, I want the code, comments, and generated documents written in English, so that the project is consistent and open to contributors.
@@ -65,7 +65,7 @@ A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, r
 
 **Modules are read in place.** The reader opens MyBible `.SQLite3` files read-only and never imports or copies their content. Our own state (config, history) lives in XDG files. No database of our own. (ADR-0002.)
 
-**Module discovery.** At startup the reader scans the configured Module directory for `*.SQLite3`, determines each Module's type from the filename suffix, and reads its `info` table for the human title and language. In 0.0.1 only Bible Modules (no suffix) are surfaced as Translations; other types are ignored. A module that fails to open, or lacks a required table, is skipped and reported as a warning.
+**Module discovery.** At startup the reader scans the Module directory — the folder named in config, or the reader's default, `$XDG_DATA_HOME/mybible` (`~/.local/share/mybible`) — for `*.SQLite3`, determines each Module's type from the filename suffix, and reads its `info` table for the human title and language. In 0.0.1 only Bible Modules (no suffix) are surfaced as Translations; other types are ignored. A module that fails to open, or lacks a required table, is skipped and reported as a warning.
 
 **In-memory data.** When a Translation becomes active, its full text is loaded into memory (a Bible is roughly 31,000 verses). Navigation and search run against that in-memory copy, so there are no per-scroll queries. Moving to another Translation replaces the in-memory copy.
 
@@ -77,9 +77,9 @@ A terminal (TUI) Bible reader for Linux that reads MyBible modules **in place, r
 
 **Interface.** The reading pane fills the screen. A top bar shows each command with the key that invokes it, plus the current Reference; it is toggled with `Ctrl-B` and visible by default. Every non-reading action opens a modal (Select Book, Select Chapter, Go to Reference, Select Translation, Search, History, Help). Modal lists are filterable by typing; `Enter` confirms; `Esc` closes. Keymap: `b` Book, `c` Chapter, `v` Go to Reference, `t` Translation, `/` Search, `H` History, `?` Help, `q` Quit; `j`/`k` Verse down/up, `Ctrl-D`/`Ctrl-U` page, `[`/`]` previous/next Chapter, `g`/`G` top/bottom of Chapter, `Ctrl-B` toggle top bar.
 
-**History.** Two related behaviours: a back/forward stack of visited References driven by jumps, and a persisted last-read Reference restored on open. The back/forward stack is kept for the session only; the last-read Reference is persisted in the XDG data directory.
+**History.** Two related behaviours: a back/forward stack of visited References driven by jumps, and a persisted last-read Reference restored on open. The back/forward stack is kept for the session only; the last-read Reference is persisted in the XDG config directory.
 
-**Configuration.** A TOML config in the XDG config directory holds the Module directory, the Active translation, the interface language, the theme selection, and optional theme color overrides. Interface strings are embedded English and Spanish maps inside the binary, with no i18n framework; language resolves from config, then the system locale, then English.
+**Configuration.** A TOML config in the XDG config directory holds the Active translation, the interface language, the theme selection, and optional theme color overrides, plus an optional Module directory overriding the default. Interface strings are embedded English and Spanish maps inside the binary, with no i18n framework; language resolves from config, then the system locale, then English.
 
 **Interfaces (seams).** The TUI depends on a small reader interface that exposes the available Translations and, for the Active translation, Books, Chapters, and Verses as values plus lookup by Reference and by search term. The SQLite-backed implementation lives behind that interface, so the TUI can be tested without SQLite and the reader can be tested without the TUI. The interface is defined at the point of use in the TUI and implemented by the module layer.
 

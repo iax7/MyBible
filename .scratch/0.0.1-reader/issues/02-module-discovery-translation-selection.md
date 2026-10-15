@@ -15,3 +15,8 @@
 - [x] Module files are opened read-only; a test asserts a Module is byte-identical after the reader opens it.
 - [x] A TUI-model test picks a Translation from a generated fixture and asserts it becomes active.
 - [x] A module-reader test asserts that a generated fixture is discovered and its type and title are read correctly.
+
+## Comments
+
+- 08 (A default Module directory) supersedes the first checklist item: a config that names no Module directory now falls back to `$XDG_DATA_HOME/mybible` instead of showing the empty-state message.
+
