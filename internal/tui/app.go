@@ -40,6 +40,7 @@ const (
 	keyChapter     = "c"
 	keyReference   = "v"
 	keyTranslation = "t"
+	keySearch      = "/"
 	keyEnter       = "enter"
 	keyClose       = "esc"
 	keyUp          = "up"
@@ -65,6 +66,7 @@ const (
 	selectBook        = "Select Book"
 	selectChapter     = "Select Chapter"
 	selectReference   = "Go to Reference"
+	searchTitle       = "Search"
 )
 
 const emptyReference = "—"
@@ -107,7 +109,8 @@ type Model struct {
 	cursor  int // index of the current Verse within the Chapter
 	top     int // first visible rendered line of the Chapter
 
-	picker choice
+	picker  choice
+	results []module.Result // the Search modal's current hits
 }
 
 // New returns a Model after loading config and scanning the Module directory.
@@ -211,6 +214,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openPicker(pickerReference)
 		case keyTranslation:
 			m = m.openPicker(pickerTranslation)
+		case keySearch:
+			m = m.openPicker(pickerSearch)
 		case keyVerseDown:
 			m = m.moveCursor(1)
 		case keyVerseUp:
@@ -420,4 +425,22 @@ func pad(s string, width int) string {
 		return s + strings.Repeat(" ", n)
 	}
 	return s
+}
+
+// truncate shortens s to width cells, marking a cut with an ellipsis.
+func truncate(s string, width int) string {
+	if width < 1 || lipgloss.Width(s) <= width {
+		return s
+	}
+	var b strings.Builder
+	used := 0
+	for _, r := range s {
+		w := lipgloss.Width(string(r))
+		if used+w > width-1 {
+			break
+		}
+		b.WriteRune(r)
+		used += w
+	}
+	return b.String() + "…"
 }

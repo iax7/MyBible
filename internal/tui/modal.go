@@ -19,6 +19,7 @@ const (
 	pickerBook
 	pickerChapter
 	pickerReference
+	pickerSearch
 )
 
 // choice is the state shared by the modals. The list modals (Translation, Book,
@@ -45,6 +46,7 @@ type pickerItem struct {
 // that makes sense.
 func (m Model) openPicker(kind pickerKind) Model {
 	m.picker = choice{kind: kind}
+	m.results = nil
 	switch kind {
 	case pickerBook:
 		m.picker.cursor = m.bookIndex(m.book.Number)
@@ -69,6 +71,7 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.picker.cursor = 0
 		m.picker.err = ""
+		m = m.refreshSearch()
 	case keyUp:
 		m.picker.cursor--
 	case keyDown:
@@ -78,12 +81,27 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.picker.query += msg.Text
 			m.picker.cursor = 0
 			m.picker.err = ""
+			m = m.refreshSearch()
 		}
 	}
 	if m.picker.isOpen() {
 		m.picker.clamp(len(m.pickerMatches()))
 	}
 	return m, nil
+}
+
+// refreshSearch recomputes the Search modal's hits after its query changes. It
+// does nothing for the other modals.
+func (m Model) refreshSearch() Model {
+	if m.picker.kind != pickerSearch {
+		return m
+	}
+	if m.text == nil {
+		m.results = nil
+		return m
+	}
+	m.results = m.text.Search(m.picker.query)
+	return m
 }
 
 // pickerConfirm applies the modal's current selection and closes it, or reports
@@ -112,8 +130,29 @@ func (m Model) pickerConfirm() Model {
 		m = m.gotoBook(value)
 	case pickerChapter:
 		m = m.gotoChapter(value)
+	case pickerSearch:
+		m = m.confirmSearch(value)
 	}
 	return m
+}
+
+// confirmSearch jumps to the Search result at index i, closing the modal.
+func (m Model) confirmSearch(i int) Model {
+	if i < 0 || i >= len(m.results) {
+		return m
+	}
+	return m.jumpToReference(m.results[i].Reference)
+}
+
+// jumpToReference jumps and closes the modal only when the Active translation
+// actually contains the Reference, the way the other jumps behave.
+func (m Model) jumpToReference(reference module.Reference) Model {
+	next, ok := m.jumpTo(reference)
+	if !ok {
+		return m
+	}
+	next.picker = choice{}
+	return next
 }
 
 // confirmReference parses the Reference modal's input and jumps to it, keeping
@@ -159,13 +198,27 @@ func (m Model) pickerItems() []pickerItem {
 			items = append(items, pickerItem{label: strconv.Itoa(chapter), search: strconv.Itoa(chapter), value: chapter})
 		}
 		return items
+	case pickerSearch:
+		items := make([]pickerItem, 0, len(m.results))
+		for i, result := range m.results {
+			items = append(items, pickerItem{
+				label: result.Reference.String() + "  " + result.Snippet,
+				value: i,
+			})
+		}
+		return items
 	}
 	return nil
 }
 
-// pickerMatches is the items that satisfy the modal's filter query.
+// pickerMatches is the items that satisfy the modal's filter query. The Search
+// modal is already matched against the Active translation, so its items pass
+// through unfiltered.
 func (m Model) pickerMatches() []pickerItem {
 	items := m.pickerItems()
+	if m.picker.kind == pickerSearch {
+		return items
+	}
 	query := strings.ToLower(m.picker.query)
 	if query == "" {
 		return items
@@ -195,9 +248,28 @@ func (m Model) pickerTitle() string {
 		return selectBook
 	case pickerChapter:
 		return selectChapter
+	case pickerSearch:
+		return searchTitle
 	default:
 		return selectTranslation
 	}
+}
+
+// pickerFilterLabel is the heading of the modal's input line.
+func (m Model) pickerFilterLabel() string {
+	if m.picker.kind == pickerSearch {
+		return searchTitle + ": "
+	}
+	return "Filter: "
+}
+
+// pickerEmptyMessage explains an empty list, distinguishing "nothing typed yet"
+// from "nothing matched".
+func (m Model) pickerEmptyMessage() string {
+	if m.picker.kind == pickerSearch && m.picker.query == "" {
+		return "Type to search"
+	}
+	return "No matches"
 }
 
 // pickerView is a list modal: a filter line above the matching rows, windowed
@@ -210,16 +282,16 @@ func (m Model) pickerView() string {
 	var b strings.Builder
 	b.WriteString(labelStyle.Render(m.pickerTitle()))
 	b.WriteString("\n\n")
-	b.WriteString(labelStyle.Render("Filter: ") + m.picker.query)
+	b.WriteString(labelStyle.Render(m.pickerFilterLabel()) + m.picker.query)
 	b.WriteString("\n\n")
 
 	matches := m.pickerMatches()
 	if len(matches) == 0 {
-		b.WriteString(labelStyle.Render("No matches"))
+		b.WriteString(labelStyle.Render(m.pickerEmptyMessage()))
 	}
 	rows, start := m.pickerRows(), windowStart(m.picker.cursor, len(matches), m.pickerRows())
 	for i := start; i < len(matches) && i < start+rows; i++ {
-		line := matches[i].label
+		line := truncate(matches[i].label, m.width-10)
 		if i == m.picker.cursor {
 			b.WriteString(keyStyle.Render("> "+line) + "\n")
 		} else {

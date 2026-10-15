@@ -20,10 +20,13 @@ type bookText struct {
 }
 
 // Verse is one numbered unit of text within a Chapter. Text keeps the Module's
-// inline markup; ParseMarkup turns it into display Runs.
+// inline markup; ParseMarkup turns it into display Runs. normalized is the
+// display text lowercased and stripped of accents, built once at load time so
+// Search needs no case- or accent-insensitive SQL.
 type Verse struct {
-	Number int
-	Text   string
+	Number     int
+	Text       string
+	normalized string
 }
 
 // Load reads the whole Translation into memory at once (a Bible is roughly
@@ -73,6 +76,7 @@ func (t Translation) Load() (*Text, error) {
 			entry.chapters = append(entry.chapters, nil)
 		}
 		verse.Text = text.String
+		verse.normalized = searchable(verse.Text)
 		entry.chapters[chapter] = append(entry.chapters[chapter], verse)
 	}
 	if err := rows.Err(); err != nil {
