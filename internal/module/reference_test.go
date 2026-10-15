@@ -1,0 +1,42 @@
+package module
+
+import "testing"
+
+func TestParseReference(t *testing.T) {
+	cases := []struct {
+		text string
+		want Reference
+		ok   bool
+	}{
+		{"John 3:16", Reference{Book: Book{Number: 500, Name: "John"}, Chapter: 3, Verse: 16}, true},
+		{"john 3:16", Reference{Book: Book{Number: 500, Name: "John"}, Chapter: 3, Verse: 16}, true},
+		{"1 Samuel 3", Reference{Book: Book{Number: 90, Name: "1 Samuel"}, Chapter: 3, Verse: 1}, true},
+		{"Song of Songs 1:2", Reference{Book: Book{Number: 260, Name: "Song of Songs"}, Chapter: 1, Verse: 2}, true},
+		{"  Genesis   2:3  ", Reference{Book: Book{Number: 10, Name: "Genesis"}, Chapter: 2, Verse: 3}, true},
+		{"John", Reference{}, false},
+		{"3:16", Reference{}, false},
+		{"Nonexistent 1:1", Reference{}, false},
+		{"John 0:1", Reference{}, false},
+		{"John 3:0", Reference{}, false},
+		{"John 3:", Reference{}, false},
+		{"John 3:16:2", Reference{}, false},
+		{"", Reference{}, false},
+	}
+	for _, tc := range cases {
+		got, ok := ParseReference(tc.text)
+		if ok != tc.ok || got != tc.want {
+			t.Errorf("ParseReference(%q) = %+v, %v; want %+v, %v", tc.text, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestReferenceStringRoundTrips(t *testing.T) {
+	ref := Reference{Book: Book{Number: 500, Name: "John"}, Chapter: 3, Verse: 16}
+	if got := ref.String(); got != "John 3:16" {
+		t.Errorf("Reference.String() = %q, want %q", got, "John 3:16")
+	}
+	back, ok := ParseReference(ref.String())
+	if !ok || back != ref {
+		t.Errorf("ParseReference(String()) = %+v, %v; want %+v", back, ok, ref)
+	}
+}

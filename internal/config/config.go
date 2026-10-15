@@ -23,6 +23,7 @@ const (
 type Config struct {
 	ModuleDir         string `toml:"module_directory"`
 	ActiveTranslation string `toml:"active_translation"`
+	LastReference     string `toml:"last_reference"`
 }
 
 // Dir returns the directory holding the reader's configuration.
