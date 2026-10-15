@@ -20,11 +20,12 @@ func forward(t *testing.T, m Model) Model {
 	return m
 }
 
-// assertReference checks the top bar's current Reference.
+// assertReference checks the Reference the reader is on. The top bar names the
+// Book and the Chapter, so the Verse comes from the reader's own state.
 func assertReference(t *testing.T, m Model, want string) {
 	t.Helper()
-	if got := render(t, m); !strings.Contains(got, want) {
-		t.Errorf("reader is not on %q\n%s", want, got)
+	if got := on(m); got != want {
+		t.Errorf("reader is on %q, want %q", got, want)
 	}
 }
 

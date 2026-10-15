@@ -49,18 +49,18 @@ func resized(t *testing.T, m Model, width, height int) Model {
 
 func TestVerseCursorMovesWithJAndK(t *testing.T) {
 	m := navReader(t)
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:1") {
-		t.Fatalf("the reader did not start on Genesis 1:1\n%s", got)
+	if got := on(m); got != "Genesis 1:1" {
+		t.Fatalf("the reader did not start on Genesis 1:1, it is on %q", got)
 	}
 
 	m, _ = send(t, m, press('j', "j", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:2") {
-		t.Errorf("j did not move the Verse cursor\n%s", got)
+	if got := on(m); got != "Genesis 1:2" {
+		t.Errorf("j did not move the Verse cursor, the reader is on %q", got)
 	}
 
 	m, _ = send(t, m, press('k', "k", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:1") {
-		t.Errorf("k did not move the Verse cursor back\n%s", got)
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("k did not move the Verse cursor back, the reader is on %q", got)
 	}
 }
 
@@ -68,10 +68,10 @@ func TestTheCursorKeepsTheCurrentVerseVisible(t *testing.T) {
 	m := resized(t, navReader(t), 100, 8)
 	m, _ = send(t, m, press('G', "G", 0))
 
-	got := render(t, m)
-	if !strings.Contains(got, "Genesis 1:20") {
-		t.Fatalf("G did not move the cursor to the last Verse\n%s", got)
+	if got := on(m); got != "Genesis 1:20" {
+		t.Fatalf("G did not move the cursor to the last Verse, the reader is on %q", got)
 	}
+	got := render(t, m)
 	if !strings.Contains(got, "verse20") {
 		t.Errorf("the current Verse is not visible after G\n%s", got)
 	}
@@ -85,13 +85,13 @@ func TestPageDownAndPageUpMoveWithinTheChapter(t *testing.T) {
 	// 11 rows and a page is 11 Verses.
 	m := resized(t, navReader(t), 200, 12)
 	m, _ = send(t, m, press('d', "", tea.ModCtrl))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:12") {
-		t.Errorf("Ctrl-D did not page down\n%s", got)
+	if got := on(m); got != "Genesis 1:12" {
+		t.Errorf("Ctrl-D did not page down, the reader is on %q", got)
 	}
 
 	m, _ = send(t, m, press('u', "", tea.ModCtrl))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:1") {
-		t.Errorf("Ctrl-U did not page back up\n%s", got)
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("Ctrl-U did not page back up, the reader is on %q", got)
 	}
 }
 
@@ -108,8 +108,8 @@ func TestChapterMovementCrossesBookBoundaries(t *testing.T) {
 	}
 	for _, step := range steps {
 		m, _ = send(t, m, press(rune(step.key[0]), step.key, 0))
-		if got := render(t, m); !strings.Contains(got, step.want) {
-			t.Errorf("%s did not reach %q\n%s", step.key, step.want, got)
+		if got := on(m); got != step.want {
+			t.Errorf("%s reached %q, want %q", step.key, got, step.want)
 		}
 	}
 }
@@ -117,13 +117,13 @@ func TestChapterMovementCrossesBookBoundaries(t *testing.T) {
 func TestTopAndBottomJumpToTheChapterEnds(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('G', "G", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:20") {
-		t.Errorf("G did not jump to the bottom of the Chapter\n%s", got)
+	if got := on(m); got != "Genesis 1:20" {
+		t.Errorf("G did not jump to the bottom of the Chapter, the reader is on %q", got)
 	}
 
 	m, _ = send(t, m, press('g', "g", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:1") {
-		t.Errorf("g did not jump to the top of the Chapter\n%s", got)
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("g did not jump to the top of the Chapter, the reader is on %q", got)
 	}
 }
 
@@ -140,8 +140,8 @@ func TestTheBookPickerJumpsToABook(t *testing.T) {
 	}
 
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
-	if got := render(t, m); !strings.Contains(got, "Exodus 1:1") {
-		t.Errorf("Select Book did not jump to Exodus\n%s", got)
+	if got := on(m); got != "Exodus 1:1" {
+		t.Errorf("Select Book did not jump to Exodus, the reader is on %q", got)
 	}
 }
 
@@ -154,8 +154,8 @@ func TestTheChapterPickerJumpsToAChapter(t *testing.T) {
 
 	m = typeKey(t, m, "3")
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 3:1") {
-		t.Errorf("Select Chapter did not jump to Chapter 3\n%s", got)
+	if got := on(m); got != "Genesis 3:1" {
+		t.Errorf("Select Chapter did not jump to Chapter 3, the reader is on %q", got)
 	}
 }
 
@@ -165,8 +165,8 @@ func TestTheReferencePickerJumpsToAVerse(t *testing.T) {
 	m = typeKey(t, m, "Exodus 2:2")
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
 
-	if got := render(t, m); !strings.Contains(got, "Exodus 2:2") {
-		t.Errorf("Go to Reference did not jump to Exodus 2:2\n%s", got)
+	if got := on(m); got != "Exodus 2:2" {
+		t.Errorf("Go to Reference did not jump to Exodus 2:2, the reader is on %q", got)
 	}
 }
 
@@ -181,8 +181,8 @@ func TestTheReferencePickerRejectsMalformedInput(t *testing.T) {
 	}
 
 	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
-	if got := render(t, m); !strings.Contains(got, "Genesis 1:1") {
-		t.Errorf("the reader did not stay on its Reference after a rejection\n%s", got)
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("the reader did not stay on its Reference after a rejection, it is on %q", got)
 	}
 }
 
@@ -200,10 +200,10 @@ func TestTheReferencePickerRejectsAVerseTheTranslationLacks(t *testing.T) {
 func TestTheBarShowsTheReferenceOnANarrowTerminal(t *testing.T) {
 	m := resized(t, navReader(t), 80, 24)
 	got := render(t, m)
-	if !strings.Contains(got, "Genesis 1:1") {
+	if !strings.Contains(got, keyReference+" Genesis 1") {
 		t.Errorf("the Reference is not shown on a narrow terminal\n%s", got)
 	}
-	if !strings.Contains(got, "Quit") {
+	if !strings.Contains(got, barCommands[0].Label) {
 		t.Errorf("the commands are not shown on a narrow terminal\n%s", got)
 	}
 }
@@ -221,13 +221,13 @@ func TestTheLastReadReferenceIsRestoredOnTheNextLaunch(t *testing.T) {
 	m := newReader(t, configDir, dir)
 	m, _ = send(t, m, press(']', "]", 0)) // Genesis 2:1
 	m, _ = send(t, m, press('j', "j", 0)) // Genesis 2:2
-	if got := render(t, m); !strings.Contains(got, "Genesis 2:2") {
-		t.Fatalf("navigation did not reach Genesis 2:2\n%s", got)
+	if got := on(m); got != "Genesis 2:2" {
+		t.Fatalf("navigation did not reach Genesis 2:2, the reader is on %q", got)
 	}
 
 	send(t, m, press('q', "q", 0)) // the reader persists on quit
 
-	if got := render(t, newReader(t, configDir, dir)); !strings.Contains(got, "Genesis 2:2") {
-		t.Errorf("the last-read Reference was not restored\n%s", got)
+	if got := on(newReader(t, configDir, dir)); got != "Genesis 2:2" {
+		t.Errorf("the last-read Reference was not restored, the reader is on %q", got)
 	}
 }

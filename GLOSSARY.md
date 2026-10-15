@@ -23,6 +23,10 @@ _Avoid_: Book table, book index, catalogue
 **Book**:
 One entry in the Canonical book list.
 
+**Book classification**:
+The kind of writing a Book belongs to — the Pentateuch, the Historical books, the Poetic books, the Major prophets, the Minor prophets, the Gospels, Acts, the Epistles by Paul, the General Epistles, Revelation, or Non-canonical. MyBible colors its own book selector by it, and the reader colors a Book's name by it wherever the name is shown.
+_Avoid_: Group, category, section, genre
+
 **Chapter**:
 One numbered division of a Book.
 
@@ -38,7 +42,7 @@ The Translation currently displayed. The reader shows exactly one at a time.
 _Avoid_: Current version, selected module
 
 **Module directory**:
-The filesystem folder, set in config, scanned at startup for Modules.
+The filesystem folder scanned at startup for Modules. Overridable in config; when config names no folder the reader falls back to its own default.
 _Avoid_: Library, module path, store
 
 **History**:

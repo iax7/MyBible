@@ -4,6 +4,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/iax7/mybible/internal/config"
+	"github.com/iax7/mybible/internal/module"
 )
 
 // Palette is the full set of colors a theme is built from: field for field the
@@ -13,7 +14,7 @@ type Palette = config.Colors
 // The built-in themes, selected by name in config.
 var (
 	darkPalette = Palette{
-		Bar:       "236",
+		Bar:       "24",
 		BarText:   "252",
 		Key:       "39",
 		Label:     "245",
@@ -24,8 +25,8 @@ var (
 		CursorNum: "39",
 	}
 	lightPalette = Palette{
-		Bar:       "254",
-		BarText:   "236",
+		Bar:       "189",
+		BarText:   "235",
 		Key:       "25",
 		Label:     "240",
 		Reference: "236",
@@ -35,6 +36,49 @@ var (
 		CursorNum: "25",
 	}
 )
+
+// bookPalette is the color of every Book classification.
+type bookPalette map[module.Classification]string
+
+// The classification colors of the two built-in themes, taken from MyBible's
+// own book selector: the bright set reads on a dark terminal, the muted one on
+// a light one.
+var (
+	darkBookColors = bookPalette{
+		module.Pentateuch:      "#ccccff",
+		module.HistoricalBooks: "#ffcc99",
+		module.PoeticBooks:     "#66ff99",
+		module.MajorProphets:   "#ff9fb4",
+		module.MinorProphets:   "#ffff99",
+		module.Gospels:         "#ff6600",
+		module.Acts:            "#00ffff",
+		module.PaulineEpistles: "#ffff00",
+		module.GeneralEpistles: "#00ff00",
+		module.Revelation:      "#ff7c80",
+		module.NonCanonical:    "#c0c0c0",
+	}
+	lightBookColors = bookPalette{
+		module.Pentateuch:      "#7b7ba6",
+		module.HistoricalBooks: "#a67b50",
+		module.PoeticBooks:     "#24a650",
+		module.MajorProphets:   "#a65566",
+		module.MinorProphets:   "#a6a650",
+		module.Gospels:         "#a64200",
+		module.Acts:            "#00a6a6",
+		module.PaulineEpistles: "#a6a600",
+		module.GeneralEpistles: "#00a600",
+		module.Revelation:      "#a6373a",
+		module.NonCanonical:    "#7d7d7d",
+	}
+)
+
+// bookColorsFor resolves the classification colors of the named theme.
+func bookColorsFor(theme string) bookPalette {
+	if theme == "light" {
+		return lightBookColors
+	}
+	return darkBookColors
+}
 
 // paletteFor resolves the theme named in config, applies the color overrides,
 // and falls back to the dark theme for an unknown name.
@@ -60,7 +104,7 @@ func paletteFor(theme string, overrides config.Colors) Palette {
 	return p
 }
 
-// styles are every style the reader draws with, derived from one Palette so no
+// styles are every style the reader draws with, derived from one theme so no
 // file needs its own color literal.
 type styles struct {
 	bar       lipgloss.Style
@@ -73,10 +117,11 @@ type styles struct {
 	jesus     lipgloss.Style
 	verseNum  lipgloss.Style
 	cursorNum lipgloss.Style
+	bookColor bookPalette
 }
 
-// newStyles builds the rendered styles from a Palette.
-func newStyles(p Palette) styles {
+// newStyles builds the rendered styles from a Palette and its book colors.
+func newStyles(p Palette, bookColors bookPalette) styles {
 	return styles{
 		bar:       lipgloss.NewStyle().Background(lipgloss.Color(p.Bar)).Foreground(lipgloss.Color(p.BarText)),
 		key:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Key)),
@@ -88,5 +133,11 @@ func newStyles(p Palette) styles {
 		jesus:     lipgloss.NewStyle().Foreground(lipgloss.Color(p.Jesus)),
 		verseNum:  lipgloss.NewStyle().Foreground(lipgloss.Color(p.VerseNum)),
 		cursorNum: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.CursorNum)),
+		bookColor: bookColors,
 	}
+}
+
+// book styles a Book name by the Classification of the Book with this number.
+func (s styles) book(number int) lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(s.bookColor[module.ClassificationOf(number)]))
 }

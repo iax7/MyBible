@@ -1,12 +1,35 @@
 package tui
 
 import (
+	"log"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+// TestMain keeps the reader's XDG directories inside a temporary folder, so no
+// test reads the Modules or the config the developer happens to have.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "mybible-test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME"} {
+		if err := os.Setenv(name, dir); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	code := m.Run()
+
+	if err := os.RemoveAll(dir); err != nil {
+		log.Print(err)
+	}
+	os.Exit(code)
+}
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
@@ -26,6 +49,16 @@ func sized(t *testing.T) Model {
 	return m
 }
 
+// on is the Reference the reader is on, as "Book Chapter:Verse", or "" when it
+// has opened no Chapter.
+func on(m Model) string {
+	reference, ok := m.currentReference()
+	if !ok {
+		return ""
+	}
+	return reference.String()
+}
+
 func render(t *testing.T, m Model) string {
 	t.Helper()
 	return ansi.ReplaceAllString(m.View().Content, "")
@@ -35,32 +68,44 @@ func press(code rune, text string, mod tea.KeyMod) tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: code, Text: text, Mod: mod}
 }
 
-func TestShellShowsEveryCommandWithItsKey(t *testing.T) {
+func TestShellShowsTheActiveStateAndTheBarCommands(t *testing.T) {
 	got := render(t, sized(t))
 
-	for _, c := range Commands {
-		if !strings.Contains(got, c.Label) {
+	for _, c := range barCommands {
+		if !strings.Contains(got, c.Key+" "+c.Label) {
 			t.Errorf("top bar is missing command %q\n%s", c.Label, got)
 		}
 	}
+	if !strings.Contains(got, keyTranslation+" "+emptyReference) {
+		t.Errorf("top bar is missing the Translation placeholder\n%s", got)
+	}
+	if !strings.Contains(got, keyReference+" "+emptyReference) {
+		t.Errorf("top bar is missing the Reference placeholder\n%s", got)
+	}
 }
 
-func TestShellShowsReferencePlaceholder(t *testing.T) {
-	if got := render(t, sized(t)); !strings.Contains(got, emptyReference) {
-		t.Errorf("top bar is missing the Reference placeholder %q\n%s", emptyReference, got)
+func TestTheTopBarKeepsTheOtherCommandsOut(t *testing.T) {
+	got := render(t, sized(t))
+
+	// Everything a Command adds to the bar beyond barCommands.
+	for _, label := range []string{"Book", "Chapter", "Translation", "Go To", "Quit", "Toggle top bar", "Back", "Forward"} {
+		if strings.Contains(got, label) {
+			t.Errorf("top bar still announces %q\n%s", label, got)
+		}
 	}
 }
 
 func TestToggleBarHidesAndShowsTheTopBar(t *testing.T) {
 	m := sized(t)
+	bar := barCommands[0].Key + " " + barCommands[0].Label
 
 	m, _ = send(t, m, press('b', "", tea.ModCtrl))
-	if got := render(t, m); strings.Contains(got, "Translation") {
+	if got := render(t, m); strings.Contains(got, bar) {
 		t.Errorf("top bar still visible after Ctrl-B\n%s", got)
 	}
 
 	m, _ = send(t, m, press('b', "", tea.ModCtrl))
-	if got := render(t, m); !strings.Contains(got, "Translation") {
+	if got := render(t, m); !strings.Contains(got, bar) {
 		t.Errorf("top bar not restored after second Ctrl-B\n%s", got)
 	}
 }

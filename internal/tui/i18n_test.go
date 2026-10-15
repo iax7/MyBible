@@ -61,14 +61,9 @@ func assertSameState(t *testing.T, keys []tea.KeyPressMsg, english, spanish stri
 
 func TestTheTopBarReadsInBothLanguages(t *testing.T) {
 	for _, line := range []struct{ english, spanish string }{
-		{"Book", "Libro"},
-		{"Chapter", "Capítulo"},
-		{"Go To", "Ir a"},
-		{"Translation", "Traducción"},
 		{"Search", "Buscar"},
 		{"History", "Historial"},
 		{"Help", "Ayuda"},
-		{"Quit", "Salir"},
 	} {
 		assertSameState(t, nil, line.english, line.spanish)
 	}
@@ -76,7 +71,7 @@ func TestTheTopBarReadsInBothLanguages(t *testing.T) {
 
 func TestEveryModalTitleReadsInBothLanguages(t *testing.T) {
 	for _, modal := range []struct {
-		key             tea.KeyPressMsg
+		key              tea.KeyPressMsg
 		english, spanish string
 	}{
 		{press('b', "b", 0), selectBook, "Seleccionar libro"},
@@ -94,9 +89,14 @@ func TestTheHelpModalReadsInBothLanguages(t *testing.T) {
 	help := []tea.KeyPressMsg{press('?', "?", 0)}
 	for _, line := range []struct{ english, spanish string }{
 		{"Keys", "Teclas"},
+		{"Book", "Libro"},
+		{"Chapter", "Capítulo"},
+		{"Go To", "Ir a"},
+		{"Translation", "Traducción"},
 		{"Toggle top bar", "Mostrar u ocultar la barra"},
 		{"Back", "Atrás"},
 		{"Forward", "Adelante"},
+		{"Quit", "Salir"},
 		{"Close", "Cerrar"},
 	} {
 		assertSameState(t, help, line.english, line.spanish)
@@ -140,7 +140,7 @@ func TestLanguageInConfigBeatsTheSystemLocale(t *testing.T) {
 	t.Setenv("LC_MESSAGES", "")
 	t.Setenv("LANG", "es_ES.UTF-8")
 
-	if got := render(t, localized(t, "en")); !strings.Contains(got, "Chapter") {
+	if got := render(t, localized(t, "en")); !strings.Contains(got, "Search") {
 		t.Errorf("the config language did not win over the locale\n%s", got)
 	}
 }
@@ -151,7 +151,7 @@ func TestLanguageFallsBackToTheSystemLocale(t *testing.T) {
 	t.Setenv("LANG", "es_ES.UTF-8")
 
 	got := render(t, configured(t, config.Config{}))
-	if !strings.Contains(got, "Libro") {
+	if !strings.Contains(got, "Buscar") {
 		t.Errorf("the system locale did not select Spanish\n%s", got)
 	}
 }
@@ -162,7 +162,7 @@ func TestLanguageFallsBackToEnglish(t *testing.T) {
 	t.Setenv("LANG", "fr_FR.UTF-8")
 
 	got := render(t, configured(t, config.Config{}))
-	if !strings.Contains(got, "Book") {
+	if !strings.Contains(got, "Search") {
 		t.Errorf("an unknown locale did not fall back to English\n%s", got)
 	}
 }

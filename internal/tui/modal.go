@@ -36,11 +36,14 @@ type choice struct {
 func (c choice) isOpen() bool { return c.kind != pickerNone }
 
 // pickerItem is one row of a list modal: the text to show, the text to filter
-// by, and the value the row selects.
+// by, and the value the row selects. head is the leading text that names a Book,
+// colored with style, so the Book stands out from the rest of the row.
 type pickerItem struct {
 	label  string
 	search string
 	value  int
+	head   string
+	style  lipgloss.Style
 }
 
 // pickerSpec is everything that differs between modals: the heading, where the
@@ -92,7 +95,13 @@ var pickers = [...]pickerSpec{
 			books := m.books()
 			items := make([]pickerItem, 0, len(books))
 			for _, b := range books {
-				items = append(items, pickerItem{label: b.Name, search: b.Name, value: b.Number})
+				items = append(items, pickerItem{
+					label:  b.Name,
+					search: b.Name,
+					value:  b.Number,
+					head:   b.Name,
+					style:  m.styles.book(b.Number),
+				})
 			}
 			return items
 		},
@@ -125,6 +134,8 @@ var pickers = [...]pickerSpec{
 				items = append(items, pickerItem{
 					label: result.Reference.String() + "  " + result.Snippet,
 					value: i,
+					head:  result.Reference.Book.Name,
+					style: m.styles.book(result.Reference.Book.Number),
 				})
 			}
 			return items
@@ -152,7 +163,13 @@ var pickers = [...]pickerSpec{
 			items := make([]pickerItem, 0, len(m.history))
 			for i := len(m.history) - 1; i >= 0; i-- { // most recent first
 				reference := m.history[i].String()
-				items = append(items, pickerItem{label: reference, search: reference, value: i})
+				items = append(items, pickerItem{
+					label:  reference,
+					search: reference,
+					value:  i,
+					head:   m.history[i].Book.Name,
+					style:  m.styles.book(m.history[i].Book.Number),
+				})
 			}
 			return items
 		},
@@ -358,15 +375,32 @@ func (m Model) pickerView() string {
 	for i := start; i < len(matches) && i < start+rows; i++ {
 		line := truncate(matches[i].label, m.width-10)
 		if i == m.picker.cursor {
-			b.WriteString(m.styles.key.Render("> "+line) + "\n")
+			b.WriteString(m.styles.key.Render("> ") + m.pickerLabel(matches[i], line, true) + "\n")
 		} else {
-			b.WriteString("  " + line + "\n")
+			b.WriteString("  " + m.pickerLabel(matches[i], line, false) + "\n")
 		}
 	}
 	b.WriteString("\n" + m.styles.label.Render(m.translate(keyEnter+" to select · "+keyClose+" to close")))
 
 	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// pickerLabel renders one row, coloring the Book name it leads with. A row that
+// names no Book, or whose Book name did not survive truncation, keeps the style
+// it had before: the cursor's own on the highlighted row, none otherwise.
+func (m Model) pickerLabel(item pickerItem, line string, cursor bool) string {
+	if item.head == "" || !strings.HasPrefix(line, item.head) {
+		if cursor {
+			return m.styles.key.Render(line)
+		}
+		return line
+	}
+	style := item.style
+	if cursor {
+		style = style.Underline(true)
+	}
+	return style.Render(item.head) + strings.TrimPrefix(line, item.head)
 }
 
 // referencePickerView is the Go to Reference modal: a text field with a hint or

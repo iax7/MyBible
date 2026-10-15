@@ -18,7 +18,8 @@ type Command struct {
 	Label string
 }
 
-// Commands are the actions listed in the top bar, in display order.
+// Commands are every action the reader has, in display order. The Help modal
+// lists them all; the top bar announces only barCommands.
 var Commands = []Command{
 	{"b", "Book"},
 	{"c", "Chapter"},
@@ -31,6 +32,15 @@ var Commands = []Command{
 	{keyForward, "Forward"},
 	{"?", "Help"},
 	{"q", "Quit"},
+}
+
+// barCommands are the Commands the top bar announces, in display order. The
+// Active translation and the Reference being read lead the bar, each with the
+// key that changes it.
+var barCommands = []Command{
+	{keyHistory, "History"},
+	{keySearch, "Search"},
+	{keyHelp, "Help"},
 }
 
 // MovementCommands are the keys that move the Verse cursor or the Chapter view,
@@ -161,7 +171,7 @@ func New(opts Options) Model {
 	}
 	m.cfg = cfg
 	m.lang = resolveLanguage(cfg.Language)
-	m.styles = newStyles(paletteFor(cfg.Theme, cfg.Colors))
+	m.styles = newStyles(paletteFor(cfg.Theme, cfg.Colors), bookColorsFor(cfg.Theme))
 
 	m.moduleDir = opts.ModuleDir
 	if m.moduleDir == "" {
@@ -417,39 +427,47 @@ func (m Model) activeTranslation() (module.Translation, bool) {
 	return module.Translation{}, false
 }
 
-// barView lists every command with its key, and the current Reference. Commands
-// wrap onto extra lines whole, so a label is never split across lines.
+// barView lists the Active translation and the Reference being read with the
+// commands that act on them. Entries wrap onto extra lines whole, so a label is
+// never split across lines.
 func (m Model) barView() string {
-	parts := make([]string, 0, len(Commands))
-	for _, c := range Commands {
-		parts = append(parts, m.styles.key.Render(c.Key)+" "+m.styles.label.Render(m.translate(c.Label)))
+	parts := make([]string, 0, len(barCommands)+2)
+	parts = append(parts, m.barEntry(keyTranslation, m.activeLabel()))
+	// The Reference colors itself by the Book's Classification, so it skips the
+	// label style the other entries carry.
+	parts = append(parts, m.styles.key.Render(keyReference)+" "+m.referenceLabel())
+	for _, c := range barCommands {
+		parts = append(parts, m.barEntry(c.Key, m.translate(c.Label)))
 	}
 	lines := wrapParts(parts, m.width)
-
-	right := emptyReference
-	if reference, ok := m.currentReference(); ok {
-		right = reference.String()
-	}
-	right = m.styles.reference.Render(right)
-
-	// The Reference joins the last command line when it fits; otherwise it moves
-	// to its own line so neither is silently cut off.
-	last := len(lines) - 1
-	if lipgloss.Width(lines[last])+lipgloss.Width(right)+1 <= m.width {
-		gap := m.width - lipgloss.Width(lines[last]) - lipgloss.Width(right)
-		lines[last] += strings.Repeat(" ", gap) + right
-	} else {
-		gap := m.width - lipgloss.Width(right)
-		if gap < 0 {
-			gap = 0
-		}
-		lines = append(lines, strings.Repeat(" ", gap)+right)
-	}
 
 	for i, line := range lines {
 		lines[i] = m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// barEntry is one top bar entry: the key that changes the state it shows.
+func (m Model) barEntry(key, label string) string {
+	return m.styles.key.Render(key) + " " + m.styles.label.Render(label)
+}
+
+// activeLabel is the abbreviation of the Active translation, or a placeholder
+// when the reader holds none.
+func (m Model) activeLabel() string {
+	if m.active == "" {
+		return emptyReference
+	}
+	return m.active
+}
+
+// referenceLabel is the Book and Chapter being read, colored by the Book's
+// Classification, or a placeholder before the reader opens a Book.
+func (m Model) referenceLabel() string {
+	if m.book.Number == 0 {
+		return m.styles.reference.Render(emptyReference)
+	}
+	return m.styles.book(m.book.Number).Render(fmt.Sprintf("%s %d", m.book.Name, m.chapter))
 }
 
 // wrapParts lays out command entries on as few lines as fit width, never

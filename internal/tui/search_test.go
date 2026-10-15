@@ -57,8 +57,8 @@ func TestSearchFindsAccentedTextAndEnterJumpsToIt(t *testing.T) {
 	if strings.Contains(got, searchTitle+": ") {
 		t.Errorf("the Search modal stayed open after Enter\n%s", got)
 	}
-	if !strings.Contains(got, "John 11:35") {
-		t.Errorf("Enter did not jump to the result\n%s", got)
+	if wanted := "John 11:35"; on(m) != wanted {
+		t.Errorf("Enter did not jump to the result, the reader is on %q, want %q", on(m), wanted)
 	}
 }
 

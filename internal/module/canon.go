@@ -135,3 +135,65 @@ func init() {
 		return CanonicalBooks[i].Number < CanonicalBooks[j].Number
 	})
 }
+
+// Classification is the kind of writing a Book belongs to. It is the grouping
+// MyBible's own book selector colors by.
+type Classification int
+
+const (
+	Pentateuch Classification = iota
+	HistoricalBooks
+	PoeticBooks
+	MajorProphets
+	MinorProphets
+	Gospels
+	Acts
+	PaulineEpistles
+	GeneralEpistles
+	Revelation
+	NonCanonical
+)
+
+// classificationNumbers is the MyBible book numbers in each Classification,
+// following MyBible's own book table: the deuterocanonical Books take the
+// section MyBible gives them — Tobit, Judith and 2 Esdras with the Historical
+// Books, the Prayer of Manasseh and the Wisdom books among the Poetic ones,
+// Baruch and the Epistle of Jeremiah with the Major prophets, Laodiceans with
+// the General Epistles — while the Greek additions to Esther and Daniel, and the
+// Maccabees, are the ones MyBible leaves non-canonical.
+var classificationNumbers = map[Classification][]int{
+	Pentateuch:      {10, 20, 30, 40, 50},
+	HistoricalBooks: {60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 165, 170, 180, 190},
+	PoeticBooks:     {145, 220, 230, 240, 250, 260, 270, 280},
+	MajorProphets:   {290, 300, 310, 315, 320, 330, 340},
+	MinorProphets:   {350, 360, 370, 380, 390, 400, 410, 420, 430, 440, 450, 460},
+	Gospels:         {470, 480, 490, 500},
+	Acts:            {510},
+	PaulineEpistles: {520, 530, 540, 550, 560, 570, 580, 590, 600, 610, 620, 630, 640, 650},
+	GeneralEpistles: {660, 670, 680, 690, 700, 710, 720, 780},
+	Revelation:      {730},
+	NonCanonical:    {192, 305, 323, 325, 345, 462, 464, 466, 467},
+}
+
+// classificationByNumber indexes classificationNumbers by book_number.
+var classificationByNumber = func() map[int]Classification {
+	byNumber := make(map[int]Classification)
+	for classification, numbers := range classificationNumbers {
+		for _, number := range numbers {
+			byNumber[number] = classification
+		}
+	}
+	return byNumber
+}()
+
+// ClassificationOf returns the Classification of the Book with this MyBible
+// book number. An unknown book number is NonCanonical.
+func ClassificationOf(bookNumber int) Classification {
+	if current, ok := legacyNumbers[bookNumber]; ok {
+		bookNumber = current
+	}
+	if classification, ok := classificationByNumber[bookNumber]; ok {
+		return classification
+	}
+	return NonCanonical
+}
