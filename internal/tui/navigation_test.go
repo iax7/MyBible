@@ -279,6 +279,13 @@ func TestTheReferencePickerTakesTheFirstBookWhenTheInputNamesNone(t *testing.T) 
 	if got := on(m); got != "Genesis 2:2" {
 		t.Errorf("a Chapter:Verse with no Book did not read as the first Book's, the reader is on %q", got)
 	}
+
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "2 2") // a space divides a Chapter from a Verse too
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	if got := on(m); got != "Genesis 2:2" {
+		t.Errorf("a Chapter and Verse divided by a space did not read as the first Book's, the reader is on %q", got)
+	}
 }
 
 // Enter never guesses from the list: a name no Book has to answer to, even a
@@ -312,6 +319,66 @@ func TestTheReferencePickerRejectsAnAmbiguousModulesOwnName(t *testing.T) {
 
 	if got := render(t, m); !strings.Contains(got, "not a Reference") {
 		t.Errorf("a Book name two Books answer to was not rejected\n%s", got)
+	}
+}
+
+func TestTheReferencePickerTakesEveryChapterVerseSeparator(t *testing.T) {
+	for _, typed := range []string{"Exodus 2:2", "Exodus 2,2", "Exodus 2.2", "Exodus 2 2"} {
+		m := navReader(t)
+		m, _ = send(t, m, press('v', "v", 0))
+		m = typeKey(t, m, typed)
+		m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+		if got := on(m); got != "Exodus 2:2" {
+			t.Errorf("%q did not reach Exodus 2:2, the reader is on %q", typed, got)
+		}
+	}
+}
+
+// The modal says what it accepts: the shapes to type while no Book is named, and
+// the range of Chapters the named Book has once one is.
+func TestTheReferenceViewShowsTheChaptersTheNamedBookAccepts(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	if got := render(t, m); !strings.Contains(got, "For example: John, John 3, John 3:16") {
+		t.Fatalf("the modal does not say what to type before a Book is named\n%s", got)
+	}
+
+	m = typeKey(t, m, "exo")
+	m, _ = send(t, m, press(tea.KeyTab, "", 0))
+	if got := render(t, m); !strings.Contains(got, "Exodus 1..2") {
+		t.Errorf("the modal does not show the Chapters Exodus accepts\n%s", got)
+	}
+}
+
+// A Chapter still being typed may grow into a longer one, so the Verses appear
+// only once a separator closes it; a rejected Reference keeps the range it should
+// have fallen in beside the reason.
+func TestTheReferenceViewShowsTheVersesTheClosedChapterAccepts(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "gen 3")
+	if got := render(t, m); !strings.Contains(got, "Genesis 1..3") {
+		t.Fatalf("a Chapter still being typed did not keep the Book's Chapter range\n%s", got)
+	}
+
+	m = typeKey(t, m, ":")
+	if got := render(t, m); !strings.Contains(got, "Genesis 3:1..2") {
+		t.Fatalf("a separator did not turn the hint into the Chapter's Verses\n%s", got)
+	}
+
+	m = typeKey(t, m, "999")
+	if got := render(t, m); !strings.Contains(got, "Genesis 3:1..2") {
+		t.Errorf("an impossible Verse hid the range it should fall in\n%s", got)
+	}
+
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	got := render(t, m)
+	if !strings.Contains(got, "No such Reference") {
+		t.Errorf("a Verse the translation lacks was not rejected\n%s", got)
+	}
+	if !strings.Contains(got, "Genesis 3:1..2") {
+		t.Errorf("the rejection does not name the range the Verse should be in\n%s", got)
 	}
 }
 

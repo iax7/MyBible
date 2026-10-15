@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -254,45 +255,10 @@ func (m Model) refilter(before string) Model {
 // names and ignores the Chapter:Verse written after it.
 func (m Model) pickerFilterQuery() string {
 	if m.picker.kind == pickerReference {
-		book, _ := splitQuery(m.picker.query)
+		book, _ := module.SplitReference(m.picker.query)
 		return book
 	}
 	return m.picker.query
-}
-
-// splitQuery separates the Book an input names from the location written after
-// it. The location is the text behind the last space when that text is all
-// digits or a Chapter:Verse, so "1 Samuel" stays a Book name and "John 3" reads
-// as John with a Chapter; an input with no space is a location only when it
-// carries the colon of a Chapter:Verse, so "3" still narrows the Book list to
-// the numbered Books.
-func splitQuery(text string) (book, location string) {
-	text = strings.TrimSpace(text)
-	i := strings.LastIndexByte(text, ' ')
-	if i < 0 {
-		if isLocation(text) && strings.ContainsRune(text, ':') {
-			return "", text
-		}
-		return text, ""
-	}
-	if tail := text[i+1:]; isLocation(tail) {
-		return strings.TrimSpace(text[:i]), tail
-	}
-	return text, ""
-}
-
-// isLocation reports whether text could be the Chapter:Verse part of a
-// Reference: nothing but digits and colons.
-func isLocation(text string) bool {
-	if text == "" {
-		return false
-	}
-	for _, r := range text {
-		if r != ':' && (r < '0' || r > '9') {
-			return false
-		}
-	}
-	return true
 }
 
 // refreshSearch recomputes a modal's rows after its query changes, when its
@@ -337,7 +303,7 @@ func (m Model) pickerComplete() Model {
 	if m.picker.cursor < 0 || m.picker.cursor >= len(items) {
 		return m
 	}
-	_, location := splitQuery(m.picker.query)
+	_, location := module.SplitReference(m.picker.query)
 	m.picker.query = items[m.picker.cursor].head + " " // the Book's canonical Name
 	if location != "" {
 		m.picker.query += location
@@ -390,7 +356,7 @@ func (m Model) confirmReference() Model {
 // knows but the Active translation lacks is still read as one and reported by
 // the jump rather than as a malformed input.
 func (m Model) parseReferenceInput() (module.Reference, bool) {
-	book, location := splitQuery(m.picker.query)
+	book, location := module.SplitReference(m.picker.query)
 	text := book
 	if book == "" {
 		items := m.pickerMatches() // the translation's first Book
@@ -545,8 +511,9 @@ func (m Model) pickerLabel(item pickerItem, line string, cursor bool) string {
 	return style.Render(item.head) + strings.TrimPrefix(line, item.head)
 }
 
-// referencePickerView is the Go to Reference modal: an input line, the reason
-// the last input was rejected or an example, and the Books the input names.
+// referencePickerView is the Go to Reference modal: an input line, the reason the
+// last input was rejected and the range it should fall in, and the Books the
+// input names.
 func (m Model) referencePickerView() string {
 	var b strings.Builder
 	b.WriteString(m.styles.label.Render(m.translate(selectReference)))
@@ -555,9 +522,9 @@ func (m Model) referencePickerView() string {
 	b.WriteString("\n\n")
 	if m.picker.err != "" {
 		b.WriteString(m.styles.warning.Render(m.picker.err))
-	} else {
-		b.WriteString(m.styles.label.Render(m.translate("For example: John, John 3, John 3:16")))
+		b.WriteString("\n")
 	}
+	b.WriteString(m.styles.label.Render(m.referenceHint()))
 	if rows := m.pickerRowLines(); rows != "" {
 		b.WriteString("\n\n" + rows)
 	}
@@ -565,6 +532,39 @@ func (m Model) referencePickerView() string {
 
 	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+}
+
+// referenceHint is what the Reference modal says the input may be: the range of
+// Chapters of the Book it names, or that Chapter's range of Verses once the
+// Chapter is closed with a separator, and the accepted shapes while it names no
+// Book.
+func (m Model) referenceHint() string {
+	book, location := module.SplitReference(m.picker.query)
+	named, ok := m.namedBook(book)
+	if !ok {
+		return m.translate("For example: John, John 3, John 3:16")
+	}
+	if chapter, closed := chapterTyped(location); closed && chapter <= named.Chapters {
+		if verses := m.text.Chapter(named.Number, chapter); len(verses) > 0 {
+			return fmt.Sprintf("%s %d:1..%d", named.Name, chapter, verses[len(verses)-1].Number)
+		}
+	}
+	return fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
+}
+
+// chapterTyped is the Chapter the location opens with, and whether the reader has
+// typed past it: a separator after the digits closes the Chapter, so "3:16" and
+// "3 16" name the Verses of Chapter 3 while a bare "3" may still grow into 33.
+func chapterTyped(location string) (chapter int, closed bool) {
+	digits := 0
+	for digits < len(location) && location[digits] >= '0' && location[digits] <= '9' {
+		digits++
+	}
+	value, err := strconv.Atoi(location[:digits])
+	if err != nil {
+		return 0, false
+	}
+	return value, digits < len(location)
 }
 
 // windowStart is the first row of a window of rows lines that keeps the cursor

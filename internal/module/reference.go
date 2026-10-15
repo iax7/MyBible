@@ -20,7 +20,8 @@ func (r Reference) String() string {
 
 // ParseReference parses "John 3:16", "John 3", or "John". The Book name is
 // matched case-insensitively against the Canonical book list; a missing Chapter
-// or Verse defaults to 1. Anything else is rejected. A Book named the way a
+// or Verse defaults to 1, and the Chapter and Verse are separated by ':', a
+// comma, a period, or a space. Anything else is rejected. A Book named the way a
 // Module itself names it is not known here: a caller holding a loaded
 // Translation resolves that name first and passes the Canonical one.
 func ParseReference(text string) (Reference, bool) {
@@ -30,8 +31,8 @@ func ParseReference(text string) (Reference, bool) {
 			return Reference{Book: b, Chapter: 1, Verse: 1}, true
 		}
 	}
-	book, location, ok := splitReference(text)
-	if !ok {
+	book, location := SplitReference(text)
+	if book == "" {
 		return Reference{}, false
 	}
 	chapter, verse, ok := parseLocation(location)
@@ -46,28 +47,66 @@ func ParseReference(text string) (Reference, bool) {
 	return Reference{}, false
 }
 
-// splitReference separates the trailing Chapter:Verse from the Book name at the
-// last space, since Book names contain spaces and leading digits of their own.
-func splitReference(text string) (book, location string, ok bool) {
-	i := strings.LastIndexByte(text, ' ')
-	if i <= 0 || i == len(text)-1 {
-		return "", "", false
+// separators are the characters that divide a Chapter from a Verse.
+const separators = ":,."
+
+// SplitReference separates the Book a Reference names from the location written
+// after it. The location is the run of trailing words holding nothing but digits
+// and separators, so "1 Samuel 3" keeps its Book name whole and "John 3 16" reads
+// as John with a Chapter and a Verse. Text that names no Book is a location when
+// it carries a separator or spans more than one word — "3:16", "3 16" — while a
+// lone "3" is still a Book name, the numbered Books.
+func SplitReference(text string) (book, location string) {
+	text = strings.TrimSpace(text)
+	words := strings.Fields(text)
+	at := len(words)
+	for at > 0 && isLocation(words[at-1]) {
+		at--
 	}
-	return strings.Join(strings.Fields(text[:i]), " "), text[i+1:], true
+	if at > 0 {
+		return strings.Join(words[:at], " "), strings.Join(words[at:], " ")
+	}
+	if !strings.ContainsAny(text, separators) && len(words) < 2 {
+		return text, ""
+	}
+	return "", text
 }
 
-// parseLocation parses "3" or "3:16" into a Chapter and a Verse, both at least 1.
+// isLocation reports whether a word could be part of the location of a
+// Reference: nothing but digits and separators.
+func isLocation(word string) bool {
+	if word == "" {
+		return false
+	}
+	for _, r := range word {
+		if r != ':' && r != ',' && r != '.' && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+// parseLocation parses a Chapter, or a Chapter and a Verse divided by a
+// separator or a space: "3", "3:16", "3,16", "3.16", "3 16". Both are at least 1.
 func parseLocation(location string) (chapter, verse int, ok bool) {
 	verse = 1
-	if i := strings.IndexByte(location, ':'); i >= 0 {
-		value, err := strconv.Atoi(location[i+1:])
+	if i := strings.IndexAny(location, separators); i >= 0 {
+		value, err := strconv.Atoi(strings.TrimSpace(location[i+1:]))
 		if err != nil {
 			return 0, 0, false
 		}
-		verse = value
-		location = location[:i]
+		verse, location = value, location[:i]
+	} else if words := strings.Fields(location); len(words) > 1 {
+		if len(words) != 2 {
+			return 0, 0, false
+		}
+		value, err := strconv.Atoi(words[1])
+		if err != nil {
+			return 0, 0, false
+		}
+		verse, location = value, words[0]
 	}
-	value, err := strconv.Atoi(location)
+	value, err := strconv.Atoi(strings.TrimSpace(location))
 	if err != nil {
 		return 0, 0, false
 	}
