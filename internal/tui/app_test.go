@@ -22,7 +22,7 @@ func send(t *testing.T, m Model, msg tea.Msg) (Model, tea.Cmd) {
 
 func sized(t *testing.T) Model {
 	t.Helper()
-	m, _ := send(t, New(), tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ := send(t, New(Options{ConfigDir: t.TempDir()}), tea.WindowSizeMsg{Width: 80, Height: 24})
 	return m
 }
 

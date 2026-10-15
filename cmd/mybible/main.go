@@ -23,7 +23,7 @@ func main() {
 		return
 	}
 
-	if _, err := tea.NewProgram(tui.New()).Run(); err != nil {
+	if _, err := tea.NewProgram(tui.New(tui.Options{})).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "mybible:", err)
 		os.Exit(1)
 	}
