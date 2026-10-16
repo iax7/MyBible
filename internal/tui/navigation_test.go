@@ -352,24 +352,30 @@ func TestTheReferenceViewShowsTheChaptersTheNamedBookAccepts(t *testing.T) {
 }
 
 // A Chapter still being typed may grow into a longer one, so the Verses appear
-// only once a separator closes it; a rejected Reference keeps the range it should
-// have fallen in beside the reason.
+// only once a separator closes it — the space included — and a rejected Reference
+// keeps the range it should have fallen in beside the reason.
 func TestTheReferenceViewShowsTheVersesTheClosedChapterAccepts(t *testing.T) {
+	for _, closer := range []string{":", ",", ".", " "} {
+		m := navReader(t)
+		m, _ = send(t, m, press('v', "v", 0))
+		m = typeKey(t, m, "gen 3")
+		if got := render(t, m); !strings.Contains(got, "Genesis 1..3") {
+			t.Fatalf("a Chapter still being typed did not keep the Book's Chapter range\n%s", got)
+		}
+
+		m = typeKey(t, m, closer)
+		if got := render(t, m); !strings.Contains(got, "Genesis 3:1..2") {
+			t.Fatalf("%q did not close the Chapter and show its Verses\n%s", closer, got)
+		}
+	}
+}
+
+func TestTheReferenceViewKeepsTheRangeOfARejectedVerse(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
-	m = typeKey(t, m, "gen 3")
-	if got := render(t, m); !strings.Contains(got, "Genesis 1..3") {
-		t.Fatalf("a Chapter still being typed did not keep the Book's Chapter range\n%s", got)
-	}
-
-	m = typeKey(t, m, ":")
+	m = typeKey(t, m, "gen 3:999")
 	if got := render(t, m); !strings.Contains(got, "Genesis 3:1..2") {
-		t.Fatalf("a separator did not turn the hint into the Chapter's Verses\n%s", got)
-	}
-
-	m = typeKey(t, m, "999")
-	if got := render(t, m); !strings.Contains(got, "Genesis 3:1..2") {
-		t.Errorf("an impossible Verse hid the range it should fall in\n%s", got)
+		t.Fatalf("an impossible Verse hid the range it should fall in\n%s", got)
 	}
 
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))

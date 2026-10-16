@@ -13,7 +13,7 @@ A rejected Reference keeps that range line beside the reason, which is where an 
 - [x] `module.SplitReference` separates the location from the Book name by taking the trailing words that hold nothing but digits and separators, and treats text naming no Book as a location when it carries a separator or spans more than one word.
 - [x] `module.ParseReference` accepts `:`, `,`, `.`, and a space as the Chapter/Verse separator, alongside `John`, `John 3`, and `1 Samuel 3 16`.
 - [x] The modal filters and completes by the Book name it already resolves, and shows the Book's Chapter range while no Chapter is closed.
-- [x] A separator after the Chapter turns the line into that Chapter's Verse range, which a rejected Verse leaves visible under the message.
+- [x] A separator after the Chapter turns the line into that Chapter's Verse range — the space included, which the split drops as soon as it separates the Book name — and a rejected Verse leaves that line visible under the message.
 - [x] Tests cover the four separators through the TUI, the Book names that contain numbers and spaces, the Chapter range, the Verse range, and the rejected Verse that keeps it.
 
 ## Notes

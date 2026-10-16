@@ -544,7 +544,7 @@ func (m Model) referenceHint() string {
 	if !ok {
 		return m.translate("For example: John, John 3, John 3:16")
 	}
-	if chapter, closed := chapterTyped(location); closed && chapter <= named.Chapters {
+	if chapter, closed := chapterTyped(m.picker.query, location); closed && chapter <= named.Chapters {
 		if verses := m.text.Chapter(named.Number, chapter); len(verses) > 0 {
 			return fmt.Sprintf("%s %d:1..%d", named.Name, chapter, verses[len(verses)-1].Number)
 		}
@@ -552,10 +552,13 @@ func (m Model) referenceHint() string {
 	return fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
 }
 
-// chapterTyped is the Chapter the location opens with, and whether the reader has
-// typed past it: a separator after the digits closes the Chapter, so "3:16" and
-// "3 16" name the Verses of Chapter 3 while a bare "3" may still grow into 33.
-func chapterTyped(location string) (chapter int, closed bool) {
+// chapterTyped is the Chapter the input opens its location with, and whether the
+// reader has typed past it: a separator after the digits closes the Chapter, so
+// "3:16", "3." and "3 " name the Verses of Chapter 3 while a bare "3" may still
+// grow into 33. The input either still ends on the Chapter's digits, or on the
+// separator that closed them — the space included, which is gone from the
+// location the moment it is split off.
+func chapterTyped(query, location string) (chapter int, closed bool) {
 	digits := 0
 	for digits < len(location) && location[digits] >= '0' && location[digits] <= '9' {
 		digits++
@@ -564,7 +567,17 @@ func chapterTyped(location string) (chapter int, closed bool) {
 	if err != nil {
 		return 0, false
 	}
-	return value, digits < len(location)
+	return value, digits < len(location) || !endsWithDigit(query)
+}
+
+// endsWithDigit reports whether the input ends on a digit, the one sign that its
+// Chapter is still being written.
+func endsWithDigit(text string) bool {
+	if text == "" {
+		return false
+	}
+	last := text[len(text)-1]
+	return last >= '0' && last <= '9'
 }
 
 // windowStart is the first row of a window of rows lines that keeps the cursor
