@@ -42,14 +42,16 @@ func (m Model) bookIndex(number int) int {
 
 // renderLines renders every Verse of the current Chapter, one rendered line per
 // Verse line, remembering where the cursor Verse sits. The cursor Verse's number
-// carries the cursor style.
+// carries the cursor style. A Verse whose text opens with a paragraph or line
+// break — how a Module marks the Verse that starts a paragraph — starts on its
+// number instead, so the number never sits on a line of its own.
 func (m Model) renderLines() chapterLines {
 	var out chapterLines
 	for i, verse := range m.chapterVerses() {
 		if i == m.cursor {
 			out.from = len(out.lines)
 		}
-		for j, line := range strings.Split(m.renderMarkup(verse.Text), "\n") {
+		for j, line := range strings.Split(strings.TrimLeft(m.renderMarkup(verse.Text), "\n"), "\n") {
 			if j == 0 {
 				style := m.styles.verseNum
 				if i == m.cursor {

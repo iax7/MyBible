@@ -99,6 +99,30 @@ func TestReadingPreservesParagraphAndLineBreaks(t *testing.T) {
 	}
 }
 
+// A Module marks the Verse that opens a paragraph by starting its text with a
+// paragraph break; that break must not leave the Verse number on a line of its
+// own.
+func TestReadingDoesNotBreakAVerseThatStartsAParagraph(t *testing.T) {
+	m := activeReader(t, map[string]string{"description": "Reina-Valera 1909"}, genesis(),
+		[]modtest.Verse{
+			{Book: 10, Chapter: 1, Verse: 1, Text: "<pb/>first"},
+			{Book: 10, Chapter: 1, Verse: 2, Text: "<pb/><t>second</t> and <br/>on two lines"},
+			{Book: 10, Chapter: 1, Verse: 3, Text: "third"},
+		})
+
+	got := render(t, m)
+
+	if !hasSequence(got, "1 first", "2 second and") {
+		t.Errorf("a leading paragraph break pushed the Verse number onto its own line\n%q", got)
+	}
+	if !hasSequence(got, "2 second and", "on two lines") {
+		t.Errorf("a leading paragraph break stopped the line break inside the Verse\n%q", got)
+	}
+	if !hasSequence(got, "on two lines", "3 third") {
+		t.Errorf("the Verse after a broken one did not render\n%q", got)
+	}
+}
+
 func TestReadingAnEmptyVerseRendersWithoutError(t *testing.T) {
 	m := activeReader(t, map[string]string{"description": "Reina-Valera 1909"}, genesis(),
 		[]modtest.Verse{
