@@ -112,6 +112,7 @@ type styles struct {
 	label     lipgloss.Style
 	reference lipgloss.Style
 	warning   lipgloss.Style
+	invalid   lipgloss.Style
 	help      lipgloss.Style
 	italics   lipgloss.Style
 	jesus     lipgloss.Style
@@ -128,6 +129,7 @@ func newStyles(p Palette, bookColors bookPalette) styles {
 		label:     lipgloss.NewStyle().Foreground(lipgloss.Color(p.Label)),
 		reference: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Reference)),
 		warning:   lipgloss.NewStyle().Foreground(lipgloss.Color(p.Warning)),
+		invalid:   lipgloss.NewStyle().Foreground(lipgloss.Color(p.Jesus)), // the theme's red, for a number the translation has no Verse or Chapter for
 		help:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 3),
 		italics:   lipgloss.NewStyle().Italic(true),
 		jesus:     lipgloss.NewStyle().Foreground(lipgloss.Color(p.Jesus)),

@@ -388,19 +388,14 @@ func TestTheReferenceViewKeepsTheRangeOfARejectedVerse(t *testing.T) {
 	}
 }
 
-// A number the Book does not have turns the range line red while it is typed, and
-// a number it does have does not.
-func TestTheReferenceViewFlagsANumberTheBookLacks(t *testing.T) {
-	cases := []struct {
-		typed, rangeText string
-		outOfRange       bool
-	}{
-		{"gen 50", "Genesis 1..3", true}, // the fixture's Genesis has 3 Chapters
-		{"gen 0", "Genesis 1..3", true},
-		{"gen 3:999", "Genesis 3:1..2", true}, // Chapter 3 has 2 Verses
-		{"gen 3:0", "Genesis 3:1..2", true},
-		{"gen 3", "Genesis 1..3", false},
-		{"gen 3:2", "Genesis 3:1..2", false},
+// A number the Book has no Chapter or Verse for is picked out, whole, in red as it
+// is typed, without waiting for Enter, and the input otherwise reads as typed.
+func TestTheReferenceViewPicksOutANumberTheBookLacks(t *testing.T) {
+	cases := []struct{ typed, bad string }{
+		{"gen 50", "50"}, // the fixture's Genesis has 3 Chapters
+		{"gen 0", "0"},
+		{"gen 3:999", "999"}, // Chapter 3 has 2 Verses
+		{"gen 3:0", "0"},
 	}
 	for _, c := range cases {
 		m := navReader(t)
@@ -408,14 +403,34 @@ func TestTheReferenceViewFlagsANumberTheBookLacks(t *testing.T) {
 		m = typeKey(t, m, c.typed)
 
 		raw := m.View().Content
-		if got := strings.Contains(raw, m.styles.warning.Render(c.rangeText)); got != c.outOfRange {
-			t.Errorf("%q: flagged = %v, want %v\n%s", c.typed, got, c.outOfRange, ansi.ReplaceAllString(raw, ""))
+		if !strings.Contains(raw, m.styles.invalid.Render(c.bad)) {
+			t.Errorf("%q: the number %q was not picked out in red\n%s", c.typed, c.bad, ansi.ReplaceAllString(raw, ""))
 		}
-		if c.outOfRange {
-			continue
+		if got := ansi.ReplaceAllString(raw, ""); !strings.Contains(got, "Reference: "+c.typed) {
+			t.Errorf("%q: the input reads as something else\n%s", c.typed, got)
 		}
-		if !strings.Contains(raw, m.styles.label.Render(c.rangeText)) {
-			t.Errorf("%q: a number the Book has is not left alone\n%s", c.typed, ansi.ReplaceAllString(raw, ""))
+	}
+}
+
+func TestTheReferenceViewLeavesANumberTheBookHasAlone(t *testing.T) {
+	cases := []struct {
+		typed   string
+		numbers []string
+	}{
+		{"gen 3", []string{"3"}},
+		{"gen 3:2", []string{"3", "2"}},
+		{"gen 1:20", []string{"1", "20"}},
+	}
+	for _, c := range cases {
+		m := navReader(t)
+		m, _ = send(t, m, press('v', "v", 0))
+		m = typeKey(t, m, c.typed)
+
+		raw := m.View().Content
+		for _, number := range c.numbers {
+			if strings.Contains(raw, m.styles.invalid.Render(number)) {
+				t.Errorf("%q: the number %q was picked out though the Book has it\n%s", c.typed, number, ansi.ReplaceAllString(raw, ""))
+			}
 		}
 	}
 }

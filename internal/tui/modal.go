@@ -356,20 +356,10 @@ func (m Model) confirmReference() Model {
 // knows but the Active translation lacks is still read as one and reported by
 // the jump rather than as a malformed input.
 func (m Model) parseReferenceInput() (module.Reference, bool) {
-	book, location := module.SplitReference(m.picker.query)
-	text := book
-	if book == "" {
-		items := m.pickerMatches() // the translation's first Book
-		if m.picker.cursor < 0 || m.picker.cursor >= len(items) {
-			return module.Reference{}, false
-		}
-		text = items[m.picker.cursor].head
-	}
-	if named, ok := m.namedBook(text); ok {
-		text = named.Name
-	}
-	if location != "" {
-		text += " " + location
+	_, location := module.SplitReference(m.picker.query)
+	text := m.picker.query
+	if named, ok := m.resolvedBook(); ok {
+		text = strings.TrimSpace(named.Name + " " + location)
 	}
 	return module.ParseReference(text)
 }
@@ -511,25 +501,22 @@ func (m Model) pickerLabel(item pickerItem, line string, cursor bool) string {
 	return style.Render(item.head) + strings.TrimPrefix(line, item.head)
 }
 
-// referencePickerView is the Go to Reference modal: an input line, the reason the
-// last input was rejected and the range it should fall in, and the Books the
-// input names.
+// referencePickerView is the Go to Reference modal: an input line whose number the
+// Book lacks is picked out in red, the reason the last input was rejected or the
+// range the input may use, and the Books the input names.
 func (m Model) referencePickerView() string {
+	state := m.referenceState()
+
 	var b strings.Builder
 	b.WriteString(m.styles.label.Render(m.translate(selectReference)))
 	b.WriteString("\n\n")
-	b.WriteString(m.styles.label.Render(m.translate("Reference: ")) + m.picker.query)
+	b.WriteString(m.styles.label.Render(m.translate("Reference: ")) + m.referenceInput(state))
 	b.WriteString("\n\n")
 	if m.picker.err != "" {
 		b.WriteString(m.styles.warning.Render(m.picker.err))
 		b.WriteString("\n")
 	}
-	hint, outOfRange := m.referenceLine()
-	style := m.styles.label
-	if outOfRange { // flagged while it is typed, without waiting for Enter
-		style = m.styles.warning
-	}
-	b.WriteString(style.Render(hint))
+	b.WriteString(m.styles.label.Render(state.rangeText))
 	if rows := m.pickerRowLines(); rows != "" {
 		b.WriteString("\n\n" + rows)
 	}
@@ -539,24 +526,53 @@ func (m Model) referencePickerView() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-// referenceLine is what the Reference modal says the input may be — the accepted
-// shapes while no Book is named, the Book's range of Chapters, or a closed
-// Chapter's range of Verses — and whether the input has written a number the Book
-// does not have, which the modal flags while it is typed rather than on Enter.
-func (m Model) referenceLine() (line string, outOfRange bool) {
+// referenceInput is the input as typed, with the number the Book has no Chapter or
+// Verse for picked out, whole, in red.
+func (m Model) referenceInput(state referenceState) string {
+	if state.badStart < 0 || state.badEnd > len(m.picker.query) {
+		return m.picker.query
+	}
+	query := m.picker.query
+	bad := m.styles.invalid.Render(query[state.badStart:state.badEnd])
+	return query[:state.badStart] + bad + query[state.badEnd:]
+}
+
+// referenceState is what the Reference modal knows about its input: the range the
+// input may use, and, when the input has written a number the Active translation
+// has no Chapter or Verse for, where that number sits in the input so the modal
+// can pick it out while it is typed. badStart is -1 when every number written is
+// one the Book has.
+type referenceState struct {
+	rangeText        string
+	badStart, badEnd int
+}
+
+// referenceState reads the input and the Book it resolves to, once, for both the
+// range line and the number it may flag.
+func (m Model) referenceState() referenceState {
+	shapes := referenceState{
+		rangeText: m.translate("For example: John, John 3, John 3:16"),
+		badStart:  -1,
+	}
 	book, location := module.SplitReference(m.picker.query)
-	named, ok := m.namedBook(book)
+	typed := readLocation(m.picker.query, location)
+	if book == "" && !typed.written { // nothing said yet: no Book, no number
+		return shapes
+	}
+	named, ok := m.resolvedBook()
 	if !ok {
-		return m.translate("For example: John, John 3, John 3:16"), false
+		return shapes
 	}
 
 	chapters := fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
-	typed := readLocation(m.picker.query, location)
+	state := referenceState{rangeText: chapters, badStart: -1}
 	if !typed.written {
-		return chapters, false
+		return state
 	}
+	runs := lastNumbers(m.picker.query)
+
 	if typed.chapter < 1 || typed.chapter > named.Chapters {
-		return chapters, true
+		return state.flag(runs, chapterNumber)
 	}
 
 	verses := m.text.Chapter(named.Number, typed.chapter)
@@ -564,16 +580,72 @@ func (m Model) referenceLine() (line string, outOfRange bool) {
 	if len(verses) > 0 {
 		last = verses[len(verses)-1].Number
 	}
-	versesOfChapter := fmt.Sprintf("%s %d:1..%d", named.Name, typed.chapter, last)
-	switch {
-	case last == 0: // a Chapter the Module carries no Verse for is nowhere to go
-		return chapters, true
-	case typed.hasVerse && (typed.verse < 1 || typed.verse > last):
-		return versesOfChapter, true
-	case typed.closed:
-		return versesOfChapter, false
+	if last == 0 { // a Chapter the Module carries no Verse for is nowhere to go
+		return state.flag(runs, chapterNumber)
 	}
-	return chapters, false
+
+	if typed.closed { // a Chapter still being typed may still grow into another
+		state.rangeText = fmt.Sprintf("%s %d:1..%d", named.Name, typed.chapter, last)
+	}
+	if typed.hasVerse && (typed.verse < 1 || typed.verse > last) {
+		return state.flag(runs, verseNumber)
+	}
+	return state
+}
+
+// The numbers an input writes, in the order lastNumbers reads them.
+const (
+	chapterNumber = 0
+	verseNumber   = 1
+)
+
+// flag points the state at one of the numbers the input wrote, picked out of the
+// spans lastNumbers read.
+func (s referenceState) flag(runs [][2]int, which int) referenceState {
+	if which < len(runs) {
+		s.badStart, s.badEnd = runs[which][0], runs[which][1]
+	}
+	return s
+}
+
+// lastNumbers is the span of each run of digits the input ends with, the Chapter
+// first and the Verse last: "Genesis 3:16" gives the spans of 3 and 16, while
+// "1 Samuel 3" gives only the 3, because the Book's own number is not a location.
+func lastNumbers(text string) [][2]int {
+	text = strings.TrimRight(text, " ")
+	var runs [][2]int
+	for end := len(text); end > 0; {
+		start := end
+		for start > 0 && isDigit(text[start-1]) {
+			start--
+		}
+		if start == end {
+			break // no digit behind: the input ends on something else
+		}
+		if start > 0 && !strings.ContainsRune(":,. ", rune(text[start-1])) {
+			break // a letter, so what is left is the Book's name
+		}
+		runs = append([][2]int{{start, end}}, runs...)
+		end = start
+		for end > 0 && strings.ContainsRune(":,. ", rune(text[end-1])) {
+			end--
+		}
+	}
+	return runs
+}
+
+// resolvedBook is the Book the input reads as: the one it names, or the
+// translation's first Book — the highlighted row — when it names none.
+func (m Model) resolvedBook() (module.Book, bool) {
+	book, _ := module.SplitReference(m.picker.query)
+	if book != "" {
+		return m.namedBook(book)
+	}
+	items := m.pickerMatches()
+	if m.picker.cursor < 0 || m.picker.cursor >= len(items) {
+		return module.Book{}, false
+	}
+	return m.text.Book(items[m.picker.cursor].value)
 }
 
 // typedLocation is how far the Reference modal's input has read into a location:
