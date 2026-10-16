@@ -33,6 +33,10 @@ One numbered division of a Book.
 **Verse**:
 One numbered unit of text within a Chapter. A Module stores exactly one row per Verse.
 
+**Subheading**:
+A short heading introducing the Verses that follow it, held in a Module of its own rather than in the Bible text.
+_Avoid_: Subtitle, section title, heading
+
 **Reference**:
 The address of a Verse or a range of Verses — book, chapter, verse — used to name a location in navigation history and search results.
 _Avoid_: Citation, location, pointer
@@ -48,3 +52,7 @@ _Avoid_: Library, module path, store
 **History**:
 The back/forward stack of visited References, plus the last-read position restored on open.
 _Avoid_: Log, recents
+
+**Log**:
+The warnings the reader collected — Modules it could not read, state it could not save — shown in a modal of their own.
+_Avoid_: Errors, messages

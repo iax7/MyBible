@@ -24,12 +24,12 @@ func TestSearchOpensAndCloses(t *testing.T) {
 		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: "En el principio"}})
 
 	m, _ = send(t, m, press('/', "/", 0))
-	if got := render(t, m); !strings.Contains(got, searchTitle+": ") {
+	if got := modalText(t, m); !strings.Contains(got, searchTitle) {
 		t.Fatalf("/ did not open the Search modal\n%s", got)
 	}
 
 	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
-	if got := render(t, m); strings.Contains(got, searchTitle+": ") {
+	if got := modalText(t, m); strings.Contains(got, searchTitle) {
 		t.Errorf("Esc did not close the Search modal\n%s", got)
 	}
 }
@@ -54,7 +54,7 @@ func TestSearchFindsAccentedTextAndEnterJumpsToIt(t *testing.T) {
 
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
 	got = render(t, m)
-	if strings.Contains(got, searchTitle+": ") {
+	if strings.Contains(modalText(t, m), searchTitle) {
 		t.Errorf("the Search modal stayed open after Enter\n%s", got)
 	}
 	if wanted := "John 11:35"; on(m) != wanted {

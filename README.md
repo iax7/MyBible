@@ -5,7 +5,7 @@ A terminal (TUI) Bible reader for Linux that reads [MyBible](https://mybible.zon
 MyBible stores each translation as a `.SQLite3` file. This reader opens those files
 read-only — no import, no second copy, no new library to maintain.
 
-**Status: 0.0.1, pre-release.** The module format handling and the interface are still
+**Status: 0.0.2, pre-release.** The module format handling and the interface are still
 settling, so there are no published binaries yet.
 
 ## Build and run
@@ -29,6 +29,7 @@ go build ./cmd/mybible
 | `t` | Translation |
 | `/` | Search |
 | `H` | History |
+| `L` | Log (only when there are warnings) |
 | `?` | Help |
 | `q` | Quit |
 | `Ctrl-B` | Toggle the top bar |
@@ -41,6 +42,10 @@ Drop your `.SQLite3` files there and the reader finds them at startup. To read t
 from somewhere else, set `module_directory` in the config file. Module files are
 opened read-only and are never modified or copied. Module content is mixed-license
 and mostly not redistributable, so no module file belongs in this repository.
+
+Subheadings are read too: a `subheadings` module named after its Bible
+(`RV60-s.subheadings.SQLite3` belongs to `RV60.SQLite3`) is paired with it
+automatically, and its headings render above the verses they introduce.
 
 ## License
 

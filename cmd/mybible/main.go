@@ -12,7 +12,7 @@ import (
 )
 
 // version stays below 1.0 until the module format handling and the UX settle.
-const version = "0.0.1"
+const version = "0.0.2"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")

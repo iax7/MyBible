@@ -41,6 +41,8 @@ type Colors struct {
 	Jesus     string `toml:"jesus"`
 	VerseNum  string `toml:"verse_num"`
 	CursorNum string `toml:"cursor_num"`
+	Hint      string `toml:"hint"`
+	Field     string `toml:"field"`
 }
 
 // Dir returns the directory holding the reader's configuration.

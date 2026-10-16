@@ -22,28 +22,34 @@ const (
 	pickerReference
 	pickerSearch
 	pickerHistory
+	pickerLog
 )
 
 // choice is the state shared by the modals. The list modals (Translation, Book,
 // Chapter) filter a list and confirm a highlighted row; the Reference modal
 // edits free text and keeps an error message when the input is rejected.
 type choice struct {
-	kind   pickerKind
-	query  string
-	cursor int
-	err    string
+	kind      pickerKind
+	query     string
+	cursor    int
+	err       string
+	completed bool // the Reference modal's Tab already wrote a Book: the menu stays out of the way
+	width     int  // the widest the Reference modal has had to be, so it grows but never shrinks
 }
 
 func (c choice) isOpen() bool { return c.kind != pickerNone }
 
 // pickerItem is one row of a list modal: the text to show, the text to filter
-// by, and the value the row selects. head is the leading text that names a Book,
-// colored with style, so the Book stands out from the rest of the row.
+// by, and the value the row selects. head is the text that names a Book, colored
+// with style, so the Book stands out from the rest of the row; short is the
+// Module's own abbreviation for that Book, shown before the name and colored the
+// same way. A row that is not a Book has neither.
 type pickerItem struct {
 	label  string
 	search string
 	value  int
 	head   string
+	short  string
 	style  lipgloss.Style
 }
 
@@ -51,15 +57,15 @@ type pickerItem struct {
 // rows come from, what an empty list says, and what confirming a row does. The
 // generic modal code reads this table, so adding a modal is one entry here.
 type pickerSpec struct {
-	title         string                         // interface string key of the heading
-	items         func(m Model) []pickerItem     // the full, unfiltered row list
-	cursor        func(m Model) int              // initial cursor row, or nil for the first
-	onQuery       func(m Model) Model            // extra work when the typed query changes
-	empty         func(m Model) string           // message when no row matches, or nil for the default
-	confirm       func(m Model, value int) Model // apply the highlighted row
-	filter        bool                           // the typed query narrows the rows
-	filterByTitle bool                           // the input line is titled with the modal's own heading
-	typedOnly     bool                           // the rows appear only once the query names something
+	title      string                         // interface string key of the heading
+	items      func(m Model) []pickerItem     // the full, unfiltered row list
+	cursor     func(m Model) int              // initial cursor row, or nil for the first
+	onQuery    func(m Model) Model            // extra work when the typed query changes
+	empty      func(m Model) string           // message when no row matches, or nil for the default
+	confirm    func(m Model, value int) Model // apply the highlighted row
+	filter     bool                           // the typed query narrows the rows
+	takesInput bool                           // the modal takes a query though it does not filter its own rows
+	typedOnly  bool                           // the rows appear only once the query names something
 }
 
 // bookItems are the Active translation's Books as modal rows, in Canonical
@@ -67,17 +73,52 @@ type pickerSpec struct {
 // what confirming one does differs.
 func bookItems(m Model) []pickerItem {
 	books := m.books()
+	width := 0
+	for _, b := range books {
+		if w := lipgloss.Width(b.ShortName); w > width {
+			width = w
+		}
+	}
 	items := make([]pickerItem, 0, len(books))
 	for _, b := range books {
 		items = append(items, pickerItem{
-			label:  b.Name,
+			label:  bookLabel(b, width),
 			search: strings.Join(b.Names(), " "),
 			value:  b.Number,
 			head:   b.Name,
+			short:  b.ShortName,
 			style:  m.styles.book(b.Number),
 		})
 	}
 	return items
+}
+
+// bookSeparator is the quiet mark between a Book's abbreviation and its name: a
+// middle dot, dark grey, so the two names of the same Book read as a pair.
+const bookSeparator = " · "
+
+// bookLabel is the row a Book shows in a list: the Module's own abbreviation
+// padded so every name starts at the same column, the separator, and the
+// canonical name — "Gn   · Genesis". A Module that names the Book only in full
+// shows the name alone.
+func bookLabel(b module.Book, width int) string {
+	if b.ShortName == "" {
+		return b.Name
+	}
+	return pad(b.ShortName, width) + bookSeparator + b.Name
+}
+
+// bookParts splits a Book's row into its abbreviation and its name, the
+// separator between them already gone. A row without an abbreviation, or one
+// whose separator did not survive truncation, has no parts.
+func bookParts(item pickerItem, line string) (abbrev, name string, ok bool) {
+	if item.short == "" {
+		return "", "", false
+	}
+	if i := strings.Index(line, bookSeparator); i >= 0 {
+		return line[:i], line[i+len(bookSeparator):], true
+	}
+	return "", "", false
 }
 
 // pickers holds one entry per pickerKind, indexed by the kind. pickerNone is the
@@ -134,8 +175,8 @@ var pickers = [...]pickerSpec{
 		items:     bookItems,
 	},
 	pickerSearch: {
-		title:         searchTitle,
-		filterByTitle: true,
+		title:      searchTitle,
+		takesInput: true,
 		items: func(m Model) []pickerItem {
 			items := make([]pickerItem, 0, len(m.results))
 			for i, result := range m.results {
@@ -189,6 +230,17 @@ var pickers = [...]pickerSpec{
 		},
 		confirm: func(m Model, value int) Model { return m.jumpToHistory(value) },
 	},
+	pickerLog: {
+		title: logTitle,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, len(m.warnings))
+			for i, warning := range m.warnings {
+				items = append(items, pickerItem{label: "• " + warning, search: warning, value: i})
+			}
+			return items
+		},
+		empty: func(m Model) string { return m.translate("No warnings") },
+	},
 }
 
 // openPicker starts a modal, preselecting the reader's current position where
@@ -200,6 +252,9 @@ func (m Model) openPicker(kind pickerKind) Model {
 		m.picker.cursor = cursor(m)
 	}
 	m.picker.clamp(len(m.pickerMatches()))
+	if kind == pickerReference {
+		m.picker.width = m.referenceNeeds()
+	}
 	return m
 }
 
@@ -207,6 +262,7 @@ func (m Model) openPicker(kind pickerKind) Model {
 // list, Enter confirms, Tab completes the Reference modal, Esc closes. Every
 // modal takes the same keys.
 func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	types := m.pickerTypes()
 	switch msg.String() {
 	case keyClose:
 		m.picker = choice{}
@@ -215,18 +271,20 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case keyTab:
 		m = m.pickerComplete()
 	case keyBackspace:
-		before := m.pickerFilterQuery()
-		if runes := []rune(m.picker.query); len(runes) > 0 {
-			m.picker.query = string(runes[:len(runes)-1])
+		if types {
+			before := m.pickerFilterQuery()
+			if runes := []rune(m.picker.query); len(runes) > 0 {
+				m.picker.query = string(runes[:len(runes)-1])
+			}
+			m.picker.err = ""
+			m = m.refilter(before)
 		}
-		m.picker.err = ""
-		m = m.refilter(before)
 	case keyUp:
 		m.picker.cursor--
 	case keyDown:
 		m.picker.cursor++
 	default:
-		if msg.Text != "" {
+		if types && msg.Text != "" {
 			before := m.pickerFilterQuery()
 			m.picker.query += msg.Text
 			m.picker.err = ""
@@ -235,17 +293,30 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.picker.isOpen() {
 		m.picker.clamp(len(m.pickerMatches()))
+		if m.picker.kind == pickerReference {
+			m.picker.width = max(m.picker.width, m.referenceNeeds())
+		}
 	}
 	return m, nil
+}
+
+// pickerTypes reports whether keystrokes go into the open modal's query. The Log
+// just lists warnings: it has nothing to type.
+func (m Model) pickerTypes() bool {
+	spec := pickers[m.picker.kind]
+	return spec.filter || spec.takesInput
 }
 
 // refilter recomputes a modal's rows after its query changed, and returns the
 // cursor to the first row when the text the rows are filtered by changed, so a
 // narrowed list starts at its top. The Reference modal filters by the Book its
-// input names, so a Chapter typed after the Book leaves the highlight alone.
+// input names, so a Chapter typed after the Book leaves the highlight alone; it
+// also brings the completion menu back, since a fresh Book name is a fresh ask
+// for it.
 func (m Model) refilter(before string) Model {
 	if before != m.pickerFilterQuery() {
 		m.picker.cursor = 0
+		m.picker.completed = false
 	}
 	return m.refreshSearch()
 }
@@ -309,6 +380,7 @@ func (m Model) pickerComplete() Model {
 		m.picker.query += location
 	}
 	m.picker.err = ""
+	m.picker.completed = true // the menu did its job; it comes back only on a fresh name
 	return m
 }
 
@@ -387,8 +459,10 @@ func (m Model) pickerItems() []pickerItem {
 }
 
 // pickerMatches is the items that satisfy the modal's filter query, ignoring
-// letter case and accents. The Search modal is already matched against the
-// Active translation, so its items pass through unfiltered.
+// letter case and accents, in Canonical order. The Search modal is already
+// matched against the Active translation, so its items pass through unfiltered.
+// A Book whose abbreviation is exactly what is typed floats to the top, so "ez"
+// lands on Ezekiel before Ezra.
 func (m Model) pickerMatches() []pickerItem {
 	items := m.pickerItems()
 	if !pickers[m.picker.kind].filter {
@@ -403,6 +477,16 @@ func (m Model) pickerMatches() []pickerItem {
 		if strings.Contains(module.Normalize(item.search), query) {
 			matches = append(matches, item)
 		}
+	}
+	for i, item := range matches {
+		if item.short == "" || module.Normalize(item.short) != query {
+			continue
+		}
+		if i > 0 { // move it to the front, keeping the rest in order
+			copy(matches[1:i+1], matches[:i])
+			matches[0] = item
+		}
+		break
 	}
 	return matches
 }
@@ -421,13 +505,15 @@ func (m Model) pickerTitle() string {
 	return m.translate(pickers[m.picker.kind].title)
 }
 
-// pickerFilterLabel is the heading of the modal's input line.
-func (m Model) pickerFilterLabel() string {
-	spec := pickers[m.picker.kind]
-	if spec.filterByTitle {
-		return m.translate(spec.title) + ": "
+// pickerFilterLine is the line a list modal types into: the chevron on the
+// theme's filled band that the Go to Reference modal uses, so every modal says
+// where typing lands the same way.
+func (m Model) pickerFilterLine() string {
+	field := m.styles.field.Render("❯ " + m.picker.query)
+	if pad := fieldMinWidth - lipgloss.Width(field); pad > 0 {
+		field += m.styles.field.Render(strings.Repeat(" ", pad))
 	}
-	return m.translate("Filter: ")
+	return field
 }
 
 // pickerEmptyMessage explains an empty list, distinguishing "nothing typed yet"
@@ -447,15 +533,14 @@ func (m Model) pickerView() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(m.styles.label.Render(m.pickerTitle()))
-	b.WriteString("\n\n")
-	b.WriteString(m.styles.label.Render(m.pickerFilterLabel()) + m.picker.query)
-	b.WriteString("\n\n")
+	if m.pickerTypes() {
+		b.WriteString(m.pickerFilterLine())
+		b.WriteString("\n\n")
+	}
 	b.WriteString(m.pickerRowLines())
-	b.WriteString("\n" + m.styles.label.Render(m.translate(keyEnter+" to select · "+keyClose+" to close")))
+	b.WriteString("\n" + m.styles.hint.Render(m.translate(keyEnter+" to select")))
 
-	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return m.styles.frameBox(m.pickerTitle(), keyClose, strings.TrimRight(b.String(), "\n"))
 }
 
 // pickerRowLines is a modal's matching rows, windowed around the cursor, or the
@@ -484,57 +569,167 @@ func (m Model) pickerRowLines() string {
 	return b.String()
 }
 
-// pickerLabel renders one row, coloring the Book name it leads with. A row that
-// names no Book, or whose Book name did not survive truncation, keeps the style
-// it had before: the cursor's own on the highlighted row, none otherwise.
+// pickerLabel renders one row. A Book row colors its abbreviation and its name
+// with the Book's classification color, leaving the quiet separator between them
+// in the theme's hint grey; any other row colors the Book name it carries. A row
+// whose Book name did not survive truncation keeps the style it had before: the
+// cursor's own on the highlighted row, none otherwise.
 func (m Model) pickerLabel(item pickerItem, line string, cursor bool) string {
-	if item.head == "" || !strings.HasPrefix(line, item.head) {
+	style := item.style
+	if cursor {
+		style = style.Underline(true)
+	}
+	if abbrev, name, ok := bookParts(item, line); ok {
+		return style.Render(abbrev) + m.styles.hint.Render(bookSeparator) + style.Render(name)
+	}
+	at := -1
+	if item.head != "" {
+		at = strings.Index(line, item.head)
+	}
+	if at < 0 {
 		if cursor {
 			return m.styles.key.Render(line)
 		}
 		return line
 	}
-	style := item.style
-	if cursor {
-		style = style.Underline(true)
-	}
-	return style.Render(item.head) + strings.TrimPrefix(line, item.head)
+	return line[:at] + style.Render(item.head) + line[at+len(item.head):]
 }
 
-// referencePickerView is the Go to Reference modal: an input line whose number the
-// Book lacks is picked out in red, the reason the last input was rejected or the
-// range the input may use, and the Books the input names.
+// The Reference modal's measurements: the input band is wide enough to type into
+// even when the range line is short; the completion menu stays a menu rather than
+// a list, and is indented so its chevron lines up with the input field's.
+const (
+	fieldMinWidth    = 30
+	popupRows        = 8
+	popupWidth       = 40
+	pickerPopupInset = 2
+)
+
+// referencePickerView is the Go to Reference modal: the input line the reader
+// types into, a filled band marked with a chevron so it is obvious where typing
+// lands, and, above it, the reason the last input was rejected or the range the
+// input may use. The Books the input names are not part of the box: they float
+// under the input as a menu (pickerPopupView), so a Book is never named three
+// times in the same view.
 func (m Model) referencePickerView() string {
+	status, _ := m.referenceStatus()
 	state := m.referenceState()
+	footer := m.translate(keyEnter + " to go · " + keyTab + " to complete")
+	width := max(m.picker.width, m.referenceNeeds())
 
-	var b strings.Builder
-	b.WriteString(m.styles.label.Render(m.translate(selectReference)))
-	b.WriteString("\n\n")
-	b.WriteString(m.styles.label.Render(m.translate("Reference: ")) + m.referenceInput(state))
-	b.WriteString("\n\n")
-	if m.picker.err != "" {
-		b.WriteString(m.styles.warning.Render(m.picker.err))
-		b.WriteString("\n")
+	field := m.styles.field.Render("❯ ") + m.referenceInput(state)
+	if pad := width - lipgloss.Width(field); pad > 0 {
+		field += m.styles.field.Render(strings.Repeat(" ", pad))
 	}
-	b.WriteString(m.styles.label.Render(state.rangeText))
-	if rows := m.pickerRowLines(); rows != "" {
-		b.WriteString("\n\n" + rows)
-	}
-	b.WriteString("\n" + m.styles.label.Render(m.translate(keyEnter+" to go · "+keyTab+" to complete · "+keyClose+" to close")))
 
-	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	body := strings.Join(status, "\n") + "\n" + field + "\n" + m.styles.hint.Render(footer)
+	return m.styles.frameBox(m.translate(selectReference), keyClose, body)
 }
 
-// referenceInput is the input as typed, with the number the Book has no Chapter or
-// Verse for picked out, whole, in red.
+// referenceStatus is the Reference modal's lines above the input — the reason the
+// last input was rejected, and the range the input may use — with the width the
+// widest of them needs to sit on the input's band.
+func (m Model) referenceStatus() ([]string, int) {
+	state := m.referenceState()
+	lines := make([]string, 0, 2)
+	if m.picker.err != "" {
+		lines = append(lines, m.styles.warning.Render(m.picker.err))
+	}
+	lines = append(lines, m.styles.label.Render(state.rangeText))
+
+	width := fieldMinWidth
+	for _, line := range lines {
+		if w := lipgloss.Width(line); w > width {
+			width = w
+		}
+	}
+	return lines, width
+}
+
+// referenceNeeds is the width the Reference modal's current content wants: the
+// widest of its status lines, its input, and its footer. The modal keeps the
+// widest it has needed (choice.width), so it grows to fit a line and never
+// shrinks back under the reader's eyes.
+func (m Model) referenceNeeds() int {
+	_, width := m.referenceStatus()
+	return max(width,
+		lipgloss.Width("❯ ")+lipgloss.Width(m.picker.query),
+		lipgloss.Width(m.translate(keyEnter+" to go · "+keyTab+" to complete")))
+}
+
+// referenceInput is the input as typed on the field's own background, with the
+// number the Book has no Chapter or Verse for picked out, whole, in red.
 func (m Model) referenceInput(state referenceState) string {
 	if state.badStart < 0 || state.badEnd > len(m.picker.query) {
-		return m.picker.query
+		return m.styles.field.Render(m.picker.query)
 	}
 	query := m.picker.query
-	bad := m.styles.invalid.Render(query[state.badStart:state.badEnd])
-	return query[:state.badStart] + bad + query[state.badEnd:]
+	return m.styles.field.Render(query[:state.badStart]) +
+		m.styles.invalid.Render(query[state.badStart:state.badEnd]) +
+		m.styles.field.Render(query[state.badEnd:])
+}
+
+// pickerPopupView is the Reference modal's completion menu: the Books its input
+// names, floating under the input. It is empty for every other modal, once Tab
+// has completed a Book, before anything is typed, and when nothing matches.
+func (m Model) pickerPopupView() string {
+	if m.picker.kind != pickerReference || m.picker.completed || m.pickerFilterQuery() == "" {
+		return ""
+	}
+	matches := m.pickerMatches()
+	if len(matches) == 0 {
+		return ""
+	}
+
+	rows := m.pickerRows()
+	if rows > popupRows {
+		rows = popupRows
+	}
+	start := windowStart(m.picker.cursor, len(matches), rows)
+
+	width := 0
+	for i := start; i < len(matches) && i < start+rows; i++ {
+		if w := lipgloss.Width(matches[i].label); w > width {
+			width = w
+		}
+	}
+	if width > popupWidth {
+		width = popupWidth
+	}
+
+	var b strings.Builder
+	for i := start; i < len(matches) && i < start+rows; i++ {
+		b.WriteString(m.popupRow(matches[i], i == m.picker.cursor, width))
+		b.WriteString("\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// popupRow paints one completion row on the menu's background: a Book's
+// abbreviation and name in the Book's classification color with the quiet
+// separator between them, or any other row's Book name the same way, and the
+// cursor's row picked out with a chevron and the key color.
+func (m Model) popupRow(item pickerItem, cursor bool, width int) string {
+	marker, base := "  ", m.styles.popup
+	if cursor {
+		marker, base = "> ", m.styles.popupKey
+	}
+	book := item.style.Background(lipgloss.Color(m.styles.barColor))
+
+	row := base.Render(" " + marker)
+	label := truncate(item.label, width)
+	if abbrev, name, ok := bookParts(item, label); ok {
+		row += book.Render(abbrev) + m.styles.hint.Background(lipgloss.Color(m.styles.barColor)).Render(bookSeparator) + book.Render(name)
+	} else if at := strings.Index(label, item.head); at >= 0 {
+		row += base.Render(label[:at]) + book.Render(item.head) + base.Render(label[at+len(item.head):])
+	} else {
+		row += base.Render(label)
+	}
+
+	if pad := width + 4 - lipgloss.Width(row); pad > 0 {
+		row += m.styles.popup.Render(strings.Repeat(" ", pad))
+	}
+	return row
 }
 
 // referenceState is what the Reference modal knows about its input: the range the

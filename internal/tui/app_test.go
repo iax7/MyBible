@@ -3,11 +3,14 @@ package tui
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/iax7/mybible/internal/modtest"
 )
 
 // TestMain keeps the reader's XDG directories inside a temporary folder, so no
@@ -62,6 +65,18 @@ func on(m Model) string {
 func render(t *testing.T, m Model) string {
 	t.Helper()
 	return ansi.ReplaceAllString(m.View().Content, "")
+}
+
+// modalText is the open modal's box with its styles stripped, so a test can read
+// the modal without the reading pane visible behind it. The Reference modal's
+// completion menu is part of what it shows, so it is included.
+func modalText(t *testing.T, m Model) string {
+	t.Helper()
+	text := m.modalView()
+	if popup := m.pickerPopupView(); popup != "" {
+		text += "\n" + popup
+	}
+	return ansi.ReplaceAllString(text, "")
 }
 
 func press(code rune, text string, mod tea.KeyMod) tea.KeyPressMsg {
@@ -121,6 +136,48 @@ func TestHelpOpensAndCloses(t *testing.T) {
 	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
 	if got := render(t, m); strings.Contains(got, "Movement") {
 		t.Errorf("help modal did not close on Esc\n%s", got)
+	}
+}
+
+func TestTheBarShowsTheLogOnlyWhenThereAreWarnings(t *testing.T) {
+	if got := render(t, sized(t)); strings.Contains(got, "⚠") {
+		t.Errorf("a clean reader shows the Log entry\n%s", got)
+	}
+
+	dir := t.TempDir()
+	modtest.Bible(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"})
+	if err := os.WriteFile(filepath.Join(dir, "Broken.SQLite3"), []byte("not a database"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := newReader(t, t.TempDir(), dir)
+	bar := render(t, m)
+	if !strings.Contains(bar, "⚠") || !strings.Contains(bar, "Log") {
+		t.Fatalf("the Log entry is missing with warnings present\n%s", bar)
+	}
+
+	m, _ = send(t, m, press('L', "L", 0))
+	got := render(t, m)
+	if !strings.Contains(got, "• ") {
+		t.Errorf("the Log does not list its warnings as bullets\n%s", got)
+	}
+	if strings.Contains(got, "❯") {
+		t.Errorf("the Log shows a filter line\n%s", got)
+	}
+}
+
+// A modal overlays the reading pane instead of replacing it: the Chapter stays
+// visible around the box.
+func TestAnOpenModalKeepsTheReadingPaneVisible(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+
+	got := render(t, m)
+	if !strings.Contains(got, "Go to Reference") {
+		t.Fatalf("the modal did not open\n%s", got)
+	}
+	if !strings.Contains(got, "verse01") {
+		t.Errorf("the modal erased the reading pane behind it\n%s", got)
 	}
 }
 

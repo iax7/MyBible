@@ -2,15 +2,18 @@ package module
 
 import (
 	"database/sql"
+	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // Text is one Translation's complete text, loaded into memory. The reader
 // navigates and searches this copy, so there are no per-scroll queries.
 type Text struct {
-	books []bookText
-	index map[int]int // Book number -> position in books, so lookup is not a walk
+	books    []bookText
+	index    map[int]int                  // Book number -> position in books, so lookup is not a walk
+	headings map[int]map[int][]Subheading // Book number -> Chapter -> Subheadings, from the companion Module
 }
 
 // bookText is one Book of a loaded Translation, with its Chapters indexed by
@@ -18,6 +21,13 @@ type Text struct {
 type bookText struct {
 	Book
 	chapters [][]Verse
+}
+
+// Subheading is one section heading of a Chapter: the Verse it introduces, and
+// its text with inline markup rendered away.
+type Subheading struct {
+	Verse int
+	Text  string
 }
 
 // Verse is one numbered unit of text within a Chapter. Text keeps the Module's
@@ -103,6 +113,14 @@ func (t Translation) Load() (*Text, error) {
 	for i, book := range text.books {
 		text.index[book.Number] = i
 	}
+	if t.subheadings != "" {
+		// A companion Module that cannot be read is left out: it adds headings,
+		// it is not what the reader came to read.
+		//
+		// shortcut: a broken Subheadings Module is ignored in silence; report it
+		// once the reader has somewhere to report a companion's failure.
+		text.headings, _ = loadSubheadings(t.subheadings)
+	}
 	return text, nil
 }
 
@@ -142,6 +160,72 @@ func (t *Text) Chapter(number, chapter int) []Verse {
 		return t.books[i].chapters[chapter]
 	}
 	return nil
+}
+
+// Subheadings returns the Subheadings of one Chapter, in the order the companion
+// Module writes them. A Translation with no companion returns none.
+func (t *Text) Subheadings(number, chapter int) []Subheading {
+	if chapter < 1 {
+		return nil
+	}
+	return t.headings[number][chapter]
+}
+
+// loadSubheadings reads a Subheadings Module into memory, keyed by Canonical
+// Book and Chapter. The Module carries no book table, so its own book numbers are
+// mapped into the Canonical list on the way in, the way a Bible's are.
+func loadSubheadings(path string) (map[int]map[int][]Subheading, error) {
+	db, err := openReadOnly(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = db.Close() }()
+
+	tables, err := moduleTables(db)
+	if err != nil {
+		return nil, err
+	}
+	if !tables[tableSubheadings] {
+		return nil, fmt.Errorf("missing the required %s table", tableSubheadings)
+	}
+
+	rows, err := db.Query("SELECT book_number, chapter, verse, subheading FROM subheadings ORDER BY book_number, chapter, verse, order_if_several")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	headings := make(map[int]map[int][]Subheading)
+	for rows.Next() {
+		var number, chapter, verse int
+		var text sql.NullString
+		if err := rows.Scan(&number, &chapter, &verse, &text); err != nil {
+			return nil, err
+		}
+		book, ok := canonicalBook(number)
+		if !ok || chapter < 1 {
+			continue
+		}
+		heading := strings.TrimSpace(displayText(text.String))
+		if !hasLetterOrDigit(heading) {
+			continue // a Subheading that is nothing but a cross-reference says nothing
+		}
+		if headings[book.Number] == nil {
+			headings[book.Number] = make(map[int][]Subheading)
+		}
+		headings[book.Number][chapter] = append(headings[book.Number][chapter], Subheading{Verse: verse, Text: heading})
+	}
+	return headings, rows.Err()
+}
+
+// hasLetterOrDigit reports whether text holds anything but punctuation and spaces.
+func hasLetterOrDigit(text string) bool {
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // moduleBooks reads the Module's book table and returns the Canonical Books it
@@ -197,13 +281,13 @@ type Run struct {
 	Red     bool
 }
 
-// strippedTags enclose content that 0.0.1 hides: Strong's numbers, morphology,
-// footnotes, and subheadings.
-var strippedTags = map[string]bool{"s": true, "m": true, "f": true, "h": true}
+// strippedTags enclose content that 0.0.2 hides: Strong's numbers, morphology,
+// footnotes, subheadings, and cross-reference markers.
+var strippedTags = map[string]bool{"s": true, "m": true, "f": true, "h": true, "x": true}
 
 // ParseMarkup turns a Verse's raw text into display Runs: <i> becomes italics,
 // <J> becomes the red words-of-Jesus style, <pb/> and <br/> become breaks. All
-// other tags are stripped, along with the content of <S>, <m>, <f>, and <h>.
+// other tags are stripped, along with the content of <S>, <m>, <f>, <h>, and <x>.
 func ParseMarkup(text string) []Run {
 	var runs []Run
 	var italics, red bool

@@ -80,6 +80,7 @@ func TestEveryModalTitleReadsInBothLanguages(t *testing.T) {
 		{press('v', "v", 0), selectReference, "Ir a la referencia"},
 		{press('/', "/", 0), searchTitle, "Buscar"},
 		{press('H', "H", 0), historyTitle, "Historial"},
+		{press('L', "L", 0), logTitle, "Registro"},
 	} {
 		assertSameState(t, []tea.KeyPressMsg{modal.key}, modal.english, modal.spanish)
 	}
@@ -101,6 +102,10 @@ func TestTheHelpModalReadsInBothLanguages(t *testing.T) {
 	} {
 		assertSameState(t, help, line.english, line.spanish)
 	}
+}
+
+func TestTheChapterHeadingReadsInBothLanguages(t *testing.T) {
+	assertSameState(t, nil, "Chapter 1", "Capítulo 1")
 }
 
 func TestTheModalEmptyMessagesReadInBothLanguages(t *testing.T) {

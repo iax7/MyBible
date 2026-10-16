@@ -162,10 +162,15 @@ func TestACorruptModuleIsSkippedWithAWarning(t *testing.T) {
 
 	m := newReader(t, t.TempDir(), dir)
 
-	got := render(t, m)
-	if !strings.Contains(got, "Broken.SQLite3") {
-		t.Errorf("the corrupt Module is not reported as a warning\n%s", got)
+	// Warnings live in the Log, reached from the bar; the reading pane is clean.
+	if got := render(t, m); strings.Contains(got, "Broken.SQLite3") {
+		t.Errorf("the reading pane shows a warning\n%s", got)
 	}
+	m, _ = send(t, m, press('L', "L", 0))
+	if got := render(t, m); !strings.Contains(got, "Broken.SQLite3") {
+		t.Errorf("the corrupt Module is not reported in the Log\n%s", got)
+	}
+	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
 
 	m, _ = send(t, m, press('t', "t", 0))
 	if got := render(t, m); !strings.Contains(got, "Reina-Valera 1909") {

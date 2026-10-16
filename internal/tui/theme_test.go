@@ -70,11 +70,17 @@ func TestTheBookListAndTheTopBarCarryTheClassificationColour(t *testing.T) {
 	if len(items) != 3 {
 		t.Fatalf("the book list holds %d rows, want 3", len(items))
 	}
+	if got := items[0].label; got != "Gen · Genesis" {
+		t.Errorf("the first row reads %q, want the Module's abbreviation, a separator, and the name", got)
+	}
 	for i, item := range items {
-		if item.head != item.label {
-			t.Errorf("row %d colors %q of the row %q", i, item.head, item.label)
+		if !strings.Contains(item.label, item.head) {
+			t.Errorf("row %d colors %q, which its label %q does not carry", i, item.head, item.label)
 		}
-		if rendered := item.style.Render(item.label); !strings.Contains(rendered, "\x1b[") {
+		if rendered := item.style.Render(item.short); !strings.Contains(rendered, "\x1b[") {
+			t.Errorf("row %d does not color its abbreviation %q: %q", i, item.short, rendered)
+		}
+		if rendered := item.style.Render(item.head); !strings.Contains(rendered, "\x1b[") {
 			t.Errorf("row %d (%s) is not colored: %q", i, item.label, rendered)
 		}
 	}
@@ -83,14 +89,14 @@ func TestTheBookListAndTheTopBarCarryTheClassificationColour(t *testing.T) {
 	}
 
 	m = m.gotoBook(10)
-	if !strings.Contains(m.barView(), m.styles.book(10).Render("Genesis 1")) {
+	if !strings.Contains(m.barView(), m.styles.bookTab(10).Render(" Genesis 1 ")) {
 		t.Errorf("the top bar does not name the Book with its color\n%s", m.barView())
 	}
 }
 
 func TestTheDarkAndLightThemesRenderTheWordsOfJesusDifferently(t *testing.T) {
 	dark := themedReader(t, "dark", config.Colors{}).View().Content
-	if !strings.Contains(dark, "\x1b[38;5;196m") {
+	if !strings.Contains(dark, "\x1b[38;2;255;95;110m") {
 		t.Errorf("the dark theme does not use its red for the words of Jesus\n%q", dark)
 	}
 
@@ -105,8 +111,22 @@ func TestAThemeColorOverrideWins(t *testing.T) {
 	if !strings.Contains(got, "\x1b[91m") {
 		t.Errorf("the words-of-Jesus override was ignored\n%q", got)
 	}
-	if strings.Contains(got, "\x1b[38;5;196m") {
+	if strings.Contains(got, "\x1b[38;2;255;95;110m") {
 		t.Errorf("the built-in red survived the override\n%q", got)
+	}
+}
+
+// The hint is the modal's own footer: a quiet grey, not the body text's color.
+func TestTheModalFooterTakesTheHintColor(t *testing.T) {
+	m := themedReader(t, "dark", config.Colors{Hint: "9"})
+	m, _ = send(t, m, press('t', "t", 0))
+
+	got := m.modalView()
+	if !strings.Contains(got, "enter to select") {
+		t.Fatalf("the modal footer is missing\n%q", got)
+	}
+	if !strings.Contains(got, "\x1b[91m") {
+		t.Errorf("the modal footer did not take the hint color\n%q", got)
 	}
 }
 

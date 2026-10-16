@@ -95,6 +95,32 @@ func BibleAll(t testing.TB, dir, filename string, info map[string]string, books 
 	return Create(t, dir, filename, statements...)
 }
 
+// Subheading is one row of a synthetic Subheadings Module.
+type Subheading struct {
+	Book    int
+	Chapter int
+	Verse   int
+	Order   int
+	Text    string
+}
+
+// Subheadings makes a Subheadings Module named filename inside dir with the
+// standard tables, the given info key/value pairs, and the given Subheadings.
+func Subheadings(t testing.TB, dir, filename string, info map[string]string, subheadings []Subheading) string {
+	t.Helper()
+
+	statements := []string{
+		`CREATE TABLE info (name TEXT, value TEXT)`,
+		`CREATE TABLE subheadings (book_number NUMERIC, chapter NUMERIC, verse NUMERIC, order_if_several NUMERIC, subheading TEXT, PRIMARY KEY (book_number, chapter, verse, order_if_several))`,
+	}
+	statements = append(statements, infoStatements(info)...)
+	for _, s := range subheadings {
+		statements = append(statements, "INSERT INTO subheadings (book_number, chapter, verse, order_if_several, subheading) VALUES ("+
+			itoa(s.Book)+", "+itoa(s.Chapter)+", "+itoa(s.Verse)+", "+itoa(s.Order)+", "+quote(s.Text)+")")
+	}
+	return Create(t, dir, filename, statements...)
+}
+
 // infoStatements turns the info key/value pairs into INSERT statements.
 func infoStatements(info map[string]string) []string {
 	statements := make([]string, 0, len(info))

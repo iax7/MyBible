@@ -27,6 +27,7 @@ var Commands = []Command{
 	{"t", "Translation"},
 	{"/", "Search"},
 	{"H", "History"},
+	{keyLog, "Log"},
 	{keyToggleBar, "Toggle top bar"},
 	{keyBack, "Back"},
 	{keyForward, "Forward"},
@@ -68,6 +69,7 @@ const (
 	keyTranslation = "t"
 	keySearch      = "/"
 	keyHistory     = "H"
+	keyLog         = "L"
 	keyEnter       = "enter"
 	keyTab         = "tab"
 	keyClose       = "esc"
@@ -102,6 +104,7 @@ const (
 	selectReference   = "Go to Reference"
 	searchTitle       = "Search"
 	historyTitle      = "History"
+	logTitle          = "Log"
 )
 
 const emptyReference = "—"
@@ -122,6 +125,7 @@ type Reader interface {
 	Book(number int) (module.Book, bool)
 	BookIndex(number int) int
 	Chapter(number, chapter int) []module.Verse
+	Subheadings(number, chapter int) []module.Subheading
 	Search(query string) []module.Result
 }
 
@@ -268,6 +272,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openPicker(pickerSearch)
 		case keyHistory:
 			m = m.openPicker(pickerHistory)
+		case keyLog:
+			m = m.openPicker(pickerLog)
 		case keyBack:
 			m = m.back()
 		case keyForward:
@@ -329,15 +335,76 @@ func (m Model) currentReference() (module.Reference, bool) {
 // View implements tea.Model.
 func (m Model) View() tea.View {
 	content := m.readerView()
-	if m.picker.isOpen() {
-		content = m.pickerView()
-	}
-	if m.help {
-		content = m.helpView()
+	if box := m.modalView(); box != "" {
+		x, y := centred(box, m.width, m.height)
+		content = overlay(content, box, m.width, m.height, x, y)
+		if popup := m.pickerPopupView(); popup != "" {
+			content = overlay(content, popup, m.width, m.height, x+pickerPopupInset, y+lipgloss.Height(box))
+		}
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
+}
+
+// modalView is the open modal's box, or an empty string when nothing is open.
+func (m Model) modalView() string {
+	switch {
+	case m.help:
+		return m.helpView()
+	case m.picker.isOpen():
+		return m.pickerView()
+	}
+	return ""
+}
+
+// centred is where a box sits centred on a screen of the given size.
+func centred(box string, width, height int) (int, int) {
+	x := (width - lipgloss.Width(box)) / 2
+	y := (height - lipgloss.Height(box)) / 2
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	return x, y
+}
+
+// overlay draws box at (x, y) over base without erasing what base shows around
+// it: the box covers the cells it needs and the reading pane stays visible
+// behind. The position is kept inside the screen so a box never pushes the
+// screen taller or wider than it is.
+func overlay(base, box string, width, height, x, y int) string {
+	if x > width-lipgloss.Width(box) {
+		x = width - lipgloss.Width(box)
+	}
+	if y > height-lipgloss.Height(box) {
+		y = height - lipgloss.Height(box)
+	}
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	composite := lipgloss.NewCompositor(
+		lipgloss.NewLayer(base),
+		lipgloss.NewLayer(box).X(x).Y(y),
+	).Render()
+	return padLines(composite, width)
+}
+
+// padLines pads every line of text to width cells, so a screen always keeps its
+// shape whatever the overlays left behind.
+func padLines(text string, width int) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if w := lipgloss.Width(line); w < width {
+			lines[i] = line + strings.Repeat(" ", width-w)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // paneHeight is the height left for the reading pane below the top bar.
@@ -369,7 +436,8 @@ func (m Model) readerView() string {
 }
 
 // paneContent is the reading pane: the current Chapter when a Translation is
-// loaded, otherwise an explanation of the state of the Module directory.
+// loaded, otherwise an explanation of the state of the Module directory. Warnings
+// are not shown here; they live in the Log modal.
 func (m Model) paneContent(height int) string {
 	var b strings.Builder
 	switch {
@@ -390,16 +458,13 @@ func (m Model) paneContent(height int) string {
 		b.WriteString(t.Title + "\n\n")
 		b.WriteString(m.styles.label.Render(t.Language))
 	}
-	for _, warning := range m.warnings {
-		b.WriteString("\n\n" + m.styles.warning.Render(m.translate("warning: ")+warning))
-	}
 	return b.String()
 }
 
-// renderMarkup renders a Verse's inline markup in the supported subset.
-func (m Model) renderMarkup(text string) string {
+// renderRuns renders a line of Verse Runs with each Run's style.
+func (m Model) renderRuns(runs []module.Run) string {
 	var b strings.Builder
-	for _, run := range module.ParseMarkup(text) {
+	for _, run := range runs {
 		b.WriteString(m.runStyle(run).Render(run.Text))
 	}
 	return b.String()
@@ -432,13 +497,16 @@ func (m Model) activeTranslation() (module.Translation, bool) {
 // commands that act on them. Entries wrap onto extra lines whole, so a label is
 // never split across lines.
 func (m Model) barView() string {
-	parts := make([]string, 0, len(barCommands)+2)
+	parts := make([]string, 0, len(barCommands)+3)
 	parts = append(parts, m.barEntry(keyTranslation, m.activeLabel()))
-	// The Reference colors itself by the Book's Classification, so it skips the
+	// The Reference fills its Book's color like a selected tab, so it skips the
 	// label style the other entries carry.
 	parts = append(parts, m.styles.key.Render(keyReference)+" "+m.referenceLabel())
 	for _, c := range barCommands {
 		parts = append(parts, m.barEntry(c.Key, m.translate(c.Label)))
+	}
+	if len(m.warnings) > 0 {
+		parts = append(parts, m.logEntry())
 	}
 	lines := wrapParts(parts, m.width)
 
@@ -446,6 +514,12 @@ func (m Model) barView() string {
 		lines[i] = m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// logEntry is the top bar's Log entry: the key that opens the Log and a warning
+// sign, in the theme's warning color.
+func (m Model) logEntry() string {
+	return m.styles.key.Render(keyLog) + " " + m.styles.label.Render(m.translate(logTitle)) + " " + m.styles.warning.Render("⚠")
 }
 
 // barEntry is one top bar entry: the key that changes the state it shows.
@@ -462,13 +536,14 @@ func (m Model) activeLabel() string {
 	return m.active
 }
 
-// referenceLabel is the Book and Chapter being read, colored by the Book's
-// Classification, or a placeholder before the reader opens a Book.
+// referenceLabel is the Book and Chapter being read, filled with the Book's
+// classification color like a selected tab, or a placeholder before the reader
+// opens a Book.
 func (m Model) referenceLabel() string {
 	if m.book.Number == 0 {
 		return m.styles.reference.Render(emptyReference)
 	}
-	return m.styles.book(m.book.Number).Render(fmt.Sprintf("%s %d", m.book.Name, m.chapter))
+	return m.styles.bookTab(m.book.Number).Render(fmt.Sprintf(" %s %d ", m.book.Name, m.chapter))
 }
 
 // wrapParts lays out command entries on as few lines as fit width, never
@@ -493,8 +568,6 @@ func wrapParts(parts []string, width int) []string {
 // helpView is the modal listing every keybinding, centred on the screen.
 func (m Model) helpView() string {
 	var b strings.Builder
-	b.WriteString(m.styles.label.Render(m.translate("Keys")))
-	b.WriteString("\n\n")
 	b.WriteString(m.styles.label.Render(m.translate("Movement")) + "\n")
 	for _, c := range MovementCommands {
 		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
@@ -505,8 +578,7 @@ func (m Model) helpView() string {
 	}
 	b.WriteString(binding(m.styles, keyClose, m.translate("Close")))
 
-	box := m.styles.help.Render(strings.TrimRight(b.String(), "\n"))
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return m.styles.frameBox(m.translate("Keys"), keyClose, strings.TrimRight(b.String(), "\n"))
 }
 
 func binding(s styles, key, label string) string {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/iax7/mybible/internal/config"
 	"github.com/iax7/mybible/internal/modtest"
@@ -135,13 +136,117 @@ func TestTheBookPickerJumpsToABook(t *testing.T) {
 	}
 
 	m = typeKey(t, m, "exo")
-	if got := render(t, m); strings.Contains(got, "Genesis") {
+	if got := modalText(t, m); strings.Contains(got, "Genesis") {
 		t.Errorf("the Book filter kept a non-matching Book\n%s", got)
 	}
 
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
 	if got := on(m); got != "Exodus 1:1" {
 		t.Errorf("Select Book did not jump to Exodus, the reader is on %q", got)
+	}
+}
+
+// The Select Book list shows the Module's own abbreviation beside the canonical
+// name — both in the Book's color, with a quiet separator between them — and the
+// input narrows the list by either field.
+func TestTheBookListShowsAndFiltersByTheModulesAbbreviation(t *testing.T) {
+	info, books, verses := navFixture()
+	books[0].ShortName = "Gn" // deliberately not a prefix of the canonical name
+	m := activeReader(t, info, books, verses)
+
+	m, _ = send(t, m, press('b', "b", 0))
+	if got := modalText(t, m); !strings.Contains(got, "Gn") || !strings.Contains(got, "Genesis") {
+		t.Fatalf("the Book list does not show the Module's abbreviation\n%s", got)
+	}
+	if got := modalText(t, m); strings.Contains(got, "|") {
+		t.Errorf("the Book list keeps a literal separator\n%s", got)
+	}
+	if got := m.pickerView(); !strings.Contains(got, m.styles.hint.Render(bookSeparator)) {
+		t.Errorf("the Book list does not draw the separator in the quiet grey\n%s", ansi.ReplaceAllString(got, ""))
+	}
+
+	m = typeKey(t, m, "Gn")
+	got := modalText(t, m)
+	if !strings.Contains(got, "Genesis") {
+		t.Errorf("the Book input does not match the abbreviation\n%s", got)
+	}
+	if strings.Contains(got, "Exodus") {
+		t.Errorf("the Book input kept a Book the abbreviation does not name\n%s", got)
+	}
+}
+
+// The Book names line up: the separator sits at the same column in every row.
+func TestTheBookListAlignsTheAbbreviations(t *testing.T) {
+	info, books, verses := navFixture()
+	books[0].ShortName = "Gn" // shorter than the fixture's other abbreviation
+	m := activeReader(t, info, books, verses)
+	m, _ = send(t, m, press('b', "b", 0))
+
+	columns := map[int]bool{}
+	for _, line := range strings.Split(modalText(t, m), "\n") {
+		if i := strings.Index(line, bookSeparator); i >= 0 {
+			columns[i] = true
+		}
+	}
+	if len(columns) != 1 {
+		t.Errorf("the Book rows put the separator at %d different columns, want 1\n%s", len(columns), modalText(t, m))
+	}
+}
+
+// A Book whose abbreviation is exactly what is typed floats to the top, ahead of
+// the Book Canonical order would put first; the rest keep that order.
+func TestAnExactAbbreviationMatchFloatsToTheTop(t *testing.T) {
+	info := map[string]string{"description": "Order Test"}
+	books := []modtest.Book{
+		{Number: 150, ShortName: "Esd", LongName: "Ezra", Present: true},
+		{Number: 330, ShortName: "Ez", LongName: "Ezekiel", Present: true},
+	}
+	verses := []modtest.Verse{
+		{Book: 150, Chapter: 1, Verse: 1, Text: "ezra"},
+		{Book: 330, Chapter: 1, Verse: 1, Text: "ezekiel"},
+	}
+	m := activeReader(t, info, books, verses)
+	m, _ = send(t, m, press('b', "b", 0))
+	m = typeKey(t, m, "ez")
+
+	got := modalText(t, m)
+	if !strings.Contains(got, "Ez  · Ezekiel") || !strings.Contains(got, "Esd · Ezra") {
+		t.Fatalf("the Book list did not match both Books\n%s", got)
+	}
+	if strings.Index(got, "Ezekiel") > strings.Index(got, "Ezra") {
+		t.Errorf("the exact abbreviation match did not float to the top\n%s", got)
+	}
+}
+
+// Select Book's input is drawn like the Go to Reference one — a chevron on a
+// filled band — with no filter label of its own.
+func TestTheBookPickerInputLooksLikeTheReferenceField(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('b', "b", 0))
+
+	got := modalText(t, m)
+	if !strings.Contains(got, "❯") {
+		t.Errorf("the Book input has no chevron\n%s", got)
+	}
+	if strings.Contains(got, "Filter") {
+		t.Errorf("the Book input still carries a filter label\n%s", got)
+	}
+}
+
+// Every modal that takes a query draws the same chevron on the filled input
+// field, and none labels the line with text of its own.
+func TestEveryInputModalDrawsTheSameInputField(t *testing.T) {
+	for _, key := range []string{"t", "b", "c", "/", "H", "v"} {
+		m := navReader(t)
+		m, _ = send(t, m, press(rune(key[0]), key, 0))
+
+		got := modalText(t, m)
+		if !strings.Contains(got, "❯") {
+			t.Errorf("%q: the modal has no input field\n%s", key, got)
+		}
+		if strings.Contains(got, "Filter: ") || strings.Contains(got, "Search: ") {
+			t.Errorf("%q: the modal labels its input line\n%s", key, got)
+		}
 	}
 }
 
@@ -175,12 +280,12 @@ func TestTheReferencePickerJumpsToAVerse(t *testing.T) {
 func TestTheReferencePickerListsTheBooksTheInputNames(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
-	if got := render(t, m); strings.Contains(got, "Genesis") || strings.Contains(got, "Exodus") {
+	if got := modalText(t, m); strings.Contains(got, "Genesis") || strings.Contains(got, "Exodus") {
 		t.Fatalf("v listed every Book before anything was typed\n%s", got)
 	}
 
 	m = typeKey(t, m, "exo")
-	got := render(t, m)
+	got := modalText(t, m)
 	if strings.Contains(got, "Genesis") {
 		t.Errorf("the Book list kept a Book the input does not name\n%s", got)
 	}
@@ -196,12 +301,12 @@ func TestTheReferencePickerCompletesWithTab(t *testing.T) {
 	m, _ = send(t, m, press(tea.KeyTab, "", 0))
 
 	// The trailing space keeps the Chapter off the Book's name.
-	if got := render(t, m); !strings.Contains(got, "Reference: Exodus ") {
+	if got := render(t, m); !strings.Contains(got, "❯ Exodus ") {
 		t.Fatalf("Tab did not write the highlighted Book into the input\n%s", got)
 	}
 
 	m = typeKey(t, m, "2:2")
-	if got := render(t, m); !strings.Contains(got, "Reference: Exodus 2:2") {
+	if got := render(t, m); !strings.Contains(got, "❯ Exodus 2:2") {
 		t.Fatalf("the Chapter typed after Tab did not land beside the Book's name\n%s", got)
 	}
 
@@ -211,13 +316,79 @@ func TestTheReferencePickerCompletesWithTab(t *testing.T) {
 	}
 }
 
+// Tab completes the Book and takes the completion menu away: the menu did its
+// job. A fresh Book name — after backspacing — asks for it again.
+func TestTabClosesTheCompletionMenu(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "exo")
+	if popup := ansi.ReplaceAllString(m.pickerPopupView(), ""); !strings.Contains(popup, "Exodus") {
+		t.Fatalf("the completion menu did not show the matching Book\n%s", popup)
+	}
+
+	m, _ = send(t, m, press(tea.KeyTab, "", 0))
+	if popup := m.pickerPopupView(); popup != "" {
+		t.Errorf("the completion menu stayed open after Tab completed the Book\n%s", ansi.ReplaceAllString(popup, ""))
+	}
+	if got := modalText(t, m); !strings.Contains(got, "Exodus 1..2") {
+		t.Errorf("Tab did not leave the completed Book in the input\n%s", got)
+	}
+
+	m, _ = send(t, m, press(tea.KeyBackspace, "", 0))
+	m, _ = send(t, m, press(tea.KeyBackspace, "", 0))
+	if popup := ansi.ReplaceAllString(m.pickerPopupView(), ""); !strings.Contains(popup, "Exodus") {
+		t.Errorf("a fresh Book name did not bring the completion menu back\n%s", popup)
+	}
+}
+
+// The example the modal accepts sits above the input, so the Book the input
+// names is not written three times in the same view.
+func TestTheReferenceExampleSitsAboveTheInput(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+
+	got := modalText(t, m)
+	if strings.Index(got, "For example") > strings.Index(got, "❯") {
+		t.Errorf("the example does not sit above the input\n%s", got)
+	}
+}
+
+// The modal grows to fit a line it has to show and never shrinks back under the
+// reader's eyes: its size must not flicker as the reader types.
+func TestTheReferenceModalOnlyGrows(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	width := lipgloss.Width(m.modalView())
+
+	// Tab replaces the long example line with the Book's short range.
+	m = typeKey(t, m, "exo")
+	m, _ = send(t, m, press(tea.KeyTab, "", 0))
+	if got := lipgloss.Width(m.modalView()); got != width {
+		t.Errorf("the modal changed size to %d after Tab, from %d", got, width)
+	}
+
+	// A rejection adds a message longer than the modal.
+	m = typeKey(t, m, "999")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	grown := lipgloss.Width(m.modalView())
+	if grown <= width {
+		t.Errorf("the modal did not grow for the rejection message: %d, from %d", grown, width)
+	}
+
+	// And it keeps that size: deleting the rejected input must not shrink it.
+	m, _ = send(t, m, press(tea.KeyBackspace, "", 0))
+	if got := lipgloss.Width(m.modalView()); got != grown {
+		t.Errorf("the modal changed size to %d after the message, from %d", got, grown)
+	}
+}
+
 func TestTabKeepsTheChapterAlreadyTyped(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
 	m = typeKey(t, m, "exo 2:2")
 	m, _ = send(t, m, press(tea.KeyTab, "", 0))
 
-	if got := render(t, m); !strings.Contains(got, "Reference: Exodus 2:2") {
+	if got := render(t, m); !strings.Contains(got, "❯ Exodus 2:2") {
 		t.Fatalf("Tab lost the Chapter:Verse already typed\n%s", got)
 	}
 
@@ -388,6 +559,17 @@ func TestTheReferenceViewKeepsTheRangeOfARejectedVerse(t *testing.T) {
 	}
 }
 
+// pickedOut is the ANSI sequence that opens a run the Reference modal picks out
+// in red. The run sits on the input's filled band, so the band's background is
+// already in effect; the compositor therefore emits the red foreground alone and
+// the number's own text follows. The red is the theme's one red, the color the
+// words of Jesus carry, which the picked-out style shares.
+func pickedOut(m Model, run string) string {
+	const probe = "\x00"
+	rendered := m.styles.jesus.Render(probe)
+	return rendered[:strings.IndexByte(rendered, 0)] + run
+}
+
 // A number the Book has no Chapter or Verse for is picked out, whole, in red as it
 // is typed, without waiting for Enter, and the input otherwise reads as typed.
 func TestTheReferenceViewPicksOutANumberTheBookLacks(t *testing.T) {
@@ -403,10 +585,10 @@ func TestTheReferenceViewPicksOutANumberTheBookLacks(t *testing.T) {
 		m = typeKey(t, m, c.typed)
 
 		raw := m.View().Content
-		if !strings.Contains(raw, m.styles.invalid.Render(c.bad)) {
+		if !strings.Contains(raw, pickedOut(m, c.bad)) {
 			t.Errorf("%q: the number %q was not picked out in red\n%s", c.typed, c.bad, ansi.ReplaceAllString(raw, ""))
 		}
-		if got := ansi.ReplaceAllString(raw, ""); !strings.Contains(got, "Reference: "+c.typed) {
+		if got := ansi.ReplaceAllString(raw, ""); !strings.Contains(got, "❯ "+c.typed) {
 			t.Errorf("%q: the input reads as something else\n%s", c.typed, got)
 		}
 	}
@@ -428,7 +610,7 @@ func TestTheReferenceViewLeavesANumberTheBookHasAlone(t *testing.T) {
 
 		raw := m.View().Content
 		for _, number := range c.numbers {
-			if strings.Contains(raw, m.styles.invalid.Render(number)) {
+			if strings.Contains(raw, pickedOut(m, number)) {
 				t.Errorf("%q: the number %q was picked out though the Book has it\n%s", c.typed, number, ansi.ReplaceAllString(raw, ""))
 			}
 		}
@@ -440,7 +622,7 @@ func TestTheReferencePickerRejectsMalformedInput(t *testing.T) {
 	m, _ = send(t, m, press('v', "v", 0))
 	m = typeKey(t, m, "banana")
 	m, _ = send(t, m, press(tea.KeyTab, "", 0)) // no row to complete from
-	if got := render(t, m); !strings.Contains(got, "Reference: banana") {
+	if got := render(t, m); !strings.Contains(got, "❯ banana") {
 		t.Errorf("Tab changed the input though no Book matched it\n%s", got)
 	}
 
@@ -469,7 +651,7 @@ func TestTheReferencePickerRejectsAVerseTheTranslationLacks(t *testing.T) {
 func TestTheBarShowsTheReferenceOnANarrowTerminal(t *testing.T) {
 	m := resized(t, navReader(t), 80, 24)
 	got := render(t, m)
-	if !strings.Contains(got, keyReference+" Genesis 1") {
+	if !strings.Contains(m.barView(), "Genesis 1") {
 		t.Errorf("the Reference is not shown on a narrow terminal\n%s", got)
 	}
 	if !strings.Contains(got, barCommands[0].Label) {

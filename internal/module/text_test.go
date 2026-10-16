@@ -1,6 +1,8 @@
 package module
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -169,6 +171,83 @@ func TestLoadKeepsAnEmptyVerseRow(t *testing.T) {
 	}
 }
 
+func TestLoadReadsTheCompanionSubheadings(t *testing.T) {
+	dir := t.TempDir()
+	modtest.BibleAll(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera"},
+		[]modtest.Book{{Number: 10, ShortName: "Gen", LongName: "Genesis", Present: true}},
+		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"}})
+	modtest.Subheadings(t, dir, "RST-s.subheadings.SQLite3", map[string]string{"description": "Títulos"},
+		[]modtest.Subheading{
+			{Book: 10, Chapter: 1, Verse: 1, Order: 1, Text: "The creation"},
+			{Book: 10, Chapter: 1, Verse: 1, Order: 2, Text: "The <x>Gen 1:1</x>fall"},
+		})
+
+	// The companion is paired with its Bible, not surfaced as a Translation.
+	translations, warnings := Discover(dir)
+	if len(warnings) != 0 {
+		t.Fatalf("Discover warned: %v", warnings)
+	}
+	if len(translations) != 1 || translations[0].Abbreviation != "RST" {
+		t.Fatalf("Discover = %+v, want only the RST Bible", translations)
+	}
+
+	text, err := translations[0].Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	headings := text.Subheadings(10, 1)
+	if len(headings) != 2 {
+		t.Fatalf("Subheadings(10, 1) = %+v, want the companion's two rows", headings)
+	}
+	if headings[0].Verse != 1 || headings[0].Text != "The creation" {
+		t.Errorf("first Subheading = %+v, want the companion's own text", headings[0])
+	}
+	if headings[1].Text != "The fall" {
+		t.Errorf("cross-reference was not hidden: %+v", headings[1])
+	}
+	if got := text.Subheadings(10, 2); len(got) != 0 {
+		t.Errorf("a Chapter with no Subheadings returned %+v", got)
+	}
+	if got := text.Subheadings(730, 1); len(got) != 0 {
+		t.Errorf("an unloaded Book returned %+v", got)
+	}
+}
+
+func TestLoadWithoutACompanionHasNoSubheadings(t *testing.T) {
+	text := loadFixture(t, "RST.SQLite3", map[string]string{"description": "Reina-Valera"},
+		[]modtest.Book{{Number: 10, ShortName: "Gen", LongName: "Genesis", Present: true}},
+		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"}}, true)
+
+	if got := text.Subheadings(10, 1); len(got) != 0 {
+		t.Errorf("a Translation with no companion returned %+v", got)
+	}
+}
+
+func TestLoadSurvivesABrokenCompanion(t *testing.T) {
+	dir := t.TempDir()
+	modtest.BibleAll(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera"},
+		[]modtest.Book{{Number: 10, ShortName: "Gen", LongName: "Genesis", Present: true}},
+		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"}})
+	if err := os.WriteFile(filepath.Join(dir, "RST-s.subheadings.SQLite3"), []byte("not a database"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	translations, _ := Discover(dir)
+	if len(translations) != 1 {
+		t.Fatalf("Discover found %d Translations, want the one readable Bible", len(translations))
+	}
+	text, err := translations[0].Load()
+	if err != nil {
+		t.Fatalf("a broken companion stopped the Bible from loading: %v", err)
+	}
+	if verses := text.Chapter(10, 1); len(verses) != 1 {
+		t.Errorf("Chapter(10, 1) = %+v, want the Bible readable", verses)
+	}
+	if got := text.Subheadings(10, 1); len(got) != 0 {
+		t.Errorf("a broken companion returned %+v", got)
+	}
+}
+
 func TestParseMarkup(t *testing.T) {
 	cases := []struct {
 		name string
@@ -185,7 +264,7 @@ func TestParseMarkup(t *testing.T) {
 		{"morphology stripped", "a<m>HV</m>b", []Run{{Text: "a"}, {Text: "b"}}},
 		{"footnote stripped", "a<f>note</f>b", []Run{{Text: "a"}, {Text: "b"}}},
 		{"subheading stripped", "a<h>heading</h>b", []Run{{Text: "a"}, {Text: "b"}}},
-		{"unknown tag stripped", "a<x>weird</x>b", []Run{{Text: "a"}, {Text: "weird"}, {Text: "b"}}},
+		{"cross-reference stripped", "a<x>weird</x>b", []Run{{Text: "a"}, {Text: "b"}}},
 		{"empty", "", nil},
 	}
 	for _, tc := range cases {

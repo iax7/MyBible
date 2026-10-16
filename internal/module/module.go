@@ -23,12 +23,17 @@ type Type string
 // type the reader surfaces, and the only one with no file name suffix.
 const TypeBible Type = "Bible"
 
+// TypeSubheadings is the Module type holding a Bible's Subheadings. It is never
+// surfaced as a Translation; it is read as a companion of the Bible it belongs to.
+const TypeSubheadings Type = "subheadings"
+
 const (
-	extension     = ".SQLite3"
-	tableInfo     = "info"
-	tableBooks    = "books"
-	tableBooksAll = "books_all"
-	tableVerses   = "verses"
+	extension        = ".SQLite3"
+	tableInfo        = "info"
+	tableBooks       = "books"
+	tableBooksAll    = "books_all"
+	tableVerses      = "verses"
+	tableSubheadings = "subheadings"
 )
 
 // Translation is a Module of type Bible.
@@ -37,6 +42,7 @@ type Translation struct {
 	Title        string // the human title, from info.description
 	Language     string // the two-letter language, from info.language
 	path         string
+	subheadings  string // path of the companion Subheadings Module, empty when there is none
 }
 
 // TypeOf reports the Module type encoded in a Module file name.
@@ -49,35 +55,59 @@ func TypeOf(name string) Type {
 }
 
 // Discover scans dir for Modules and returns its Bible Modules as Translations,
-// sorted by abbreviation. Non-Bible Module types are ignored. A Module that
-// cannot be read is skipped and reported in warnings; discovery never fails.
+// sorted by abbreviation. Non-Bible Module types are ignored, except a
+// Subheadings Module, which is paired with the Bible whose abbreviation its file
+// name carries; the pairing is a companion of the Translation, never a
+// Translation of its own. A Module that cannot be read is skipped and reported
+// in warnings; discovery never fails.
 func Discover(dir string) (translations []Translation, warnings []string) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*"+extension))
 	if err != nil {
 		return nil, []string{fmt.Sprintf("cannot scan the Module directory %s: %v", dir, err)}
 	}
 
+	companions := make(map[string]string) // Bible abbreviation -> Subheadings Module path
 	for _, path := range paths {
 		info, err := os.Stat(path)
 		if err != nil || !info.Mode().IsRegular() {
 			continue
 		}
-		if TypeOf(filepath.Base(path)) != TypeBible {
-			continue
+		name := filepath.Base(path)
+		switch TypeOf(name) {
+		case TypeBible:
+			translation, err := readTranslation(path)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("%s: %v", name, err))
+				continue
+			}
+			translations = append(translations, translation)
+		case TypeSubheadings:
+			companions[companionBase(name)] = path
 		}
+	}
 
-		translation, err := readTranslation(path)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: %v", filepath.Base(path), err))
-			continue
-		}
-		translations = append(translations, translation)
+	for i := range translations {
+		translations[i].subheadings = companions[translations[i].Abbreviation]
 	}
 
 	sort.Slice(translations, func(i, j int) bool {
 		return translations[i].Abbreviation < translations[j].Abbreviation
 	})
 	return translations, warnings
+}
+
+// companionBase is the abbreviation of the Bible a companion Module belongs to:
+// its name without the extension, the type suffix, and the trailing "-s" that
+// marks Subheadings, so "RV60-s.subheadings.SQLite3" names "RV60".
+//
+// shortcut: only the "-s" Subheadings suffix is honoured; teach this the other
+// companion suffixes when the reader reads more than one kind.
+func companionBase(name string) string {
+	stem := strings.TrimSuffix(name, extension)
+	if i := strings.LastIndex(stem, "."); i >= 0 {
+		stem = stem[:i]
+	}
+	return strings.TrimSuffix(stem, "-s")
 }
 
 // readTranslation opens one Bible Module read-only and reads its info table.

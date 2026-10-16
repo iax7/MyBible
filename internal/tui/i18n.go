@@ -49,18 +49,21 @@ var spanish = map[string]string{
 	"Select Book":        "Seleccionar libro",
 	"Select Chapter":     "Seleccionar capítulo",
 	"Go to Reference":    "Ir a la referencia",
+	"Log":                "Registro",
 
 	// Modal bodies.
-	"Filter: ":                             "Filtro: ",
-	"Type to search":                       "Escribe para buscar",
-	"Nothing visited yet":                  "Aún no has visitado nada",
-	"No matches":                           "Sin resultados",
-	"enter to select · esc to close":       "enter para seleccionar · esc para cerrar",
-	"Reference: ":                          "Referencia: ",
-	"For example: John, John 3, John 3:16": "Por ejemplo: John, John 3, John 3:16",
-	"enter to go · tab to complete · esc to close": "enter para ir · tab para completar · esc para cerrar",
+	"Type to search":                               "Escribe para buscar",
+	"Nothing visited yet":                          "Aún no has visitado nada",
+	"No matches":                                   "Sin resultados",
+	"No warnings":                                  "Sin avisos",
+	"enter to select":                              "enter para seleccionar",
+	"For example: John, John 3, John 3:16":         "Por ejemplo: John, John 3, John 3:16",
+	"enter to go · tab to complete":                "enter para ir · tab para completar",
 	"That is not a Reference. Try John 3:16.":      "Eso no es una referencia. Prueba con John 3:16.",
 	"No such Reference in the Active translation.": "Esa referencia no existe en la traducción activa.",
+
+	// Reading pane.
+	"Chapter %d": "Capítulo %d",
 
 	// Empty states and warnings.
 	"No Module directory configured.":                            "No hay un directorio de módulos configurado.",
@@ -70,7 +73,6 @@ var spanish = map[string]string{
 	"Put your *.SQLite3 modules there, then restart the reader.": "Coloca allí tus módulos *.SQLite3 y reinicia el lector.",
 	"No Active translation.":                                     "No hay una traducción activa.",
 	"Press %s to choose one.":                                    "Pulsa %s para elegir una.",
-	"warning: ":                                                  "aviso: ",
 }
 
 // resolveLanguage picks the interface language: the config value first, then

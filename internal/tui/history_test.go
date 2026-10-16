@@ -82,10 +82,10 @@ func TestHistoryModalListsJumpsMostRecentFirst(t *testing.T) {
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0)) // Exodus 2:1       Search result
 
 	m, _ = send(t, m, press('H', "H", 0))
-	got := render(t, m)
-	if !strings.Contains(got, "Filter: ") {
+	if got := modalText(t, m); !strings.Contains(got, historyTitle) {
 		t.Fatalf("H did not open the History modal\n%s", got)
 	}
+	got := render(t, m)
 
 	order := []string{"Exodus 2:1", "Genesis 1:5", "Exodus 1:1", "Genesis 3:1", "Genesis 2:1", "Genesis 1:1"}
 	for i := 0; i+1 < len(order); i++ {
@@ -103,7 +103,7 @@ func TestHistoryModalListsJumpsMostRecentFirst(t *testing.T) {
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
 
 	assertReference(t, m, "Exodus 1:1")
-	if got := render(t, m); strings.Contains(got, "Filter: ") {
+	if got := modalText(t, m); strings.Contains(got, historyTitle) {
 		t.Errorf("the History modal stayed open after Enter\n%s", got)
 	}
 }
@@ -118,7 +118,7 @@ func TestHistoryModalIsFilterable(t *testing.T) {
 	m, _ = send(t, m, press('H', "H", 0))
 	m = typeKey(t, m, "gen")
 
-	got := render(t, m)
+	got := modalText(t, m)
 	if !strings.Contains(got, "Genesis 2:1") || !strings.Contains(got, "Genesis 1:1") {
 		t.Errorf("the History filter dropped a matching Reference\n%s", got)
 	}

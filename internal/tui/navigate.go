@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
+
+	"charm.land/lipgloss/v2"
 
 	"github.com/iax7/mybible/internal/module"
 )
@@ -41,31 +44,82 @@ func (m Model) bookIndex(number int) int {
 }
 
 // renderLines renders every Verse of the current Chapter, one rendered line per
-// Verse line, remembering where the cursor Verse sits. The cursor Verse's number
-// carries the cursor style. A Verse whose text opens with a paragraph or line
-// break — how a Module marks the Verse that starts a paragraph — starts on its
-// number instead, so the number never sits on a line of its own.
+// wrapped Verse line, remembering where the cursor Verse sits. The Chapter opens
+// with a centred heading. A Verse's text wraps at the pane's width; only the
+// first line carries the number, and every continuation line is indented under
+// the Verse's text. A Verse whose text opens with a paragraph or line break — how
+// a Module marks the Verse that starts a paragraph — drops that break, so the
+// number never sits on a line of its own. A Subheading renders on its own line
+// above the Verse it introduces.
 func (m Model) renderLines() chapterLines {
 	var out chapterLines
+	if heading := m.chapterHeading(); heading != "" {
+		out.lines = append(out.lines, heading)
+	}
+	subheadings := m.chapterSubheadings()
 	for i, verse := range m.chapterVerses() {
 		if i == m.cursor {
 			out.from = len(out.lines)
 		}
-		for j, line := range strings.Split(strings.TrimLeft(m.renderMarkup(verse.Text), "\n"), "\n") {
-			if j == 0 {
-				style := m.styles.verseNum
-				if i == m.cursor {
-					style = m.styles.cursorNum
+		for _, subheading := range subheadings[verse.Number] {
+			out.lines = append(out.lines, m.styles.subheading.Render(subheading.Text))
+		}
+		number := strconv.Itoa(verse.Number)
+		numStyle := m.styles.verseNum
+		if i == m.cursor {
+			numStyle = m.styles.cursorNum
+		}
+		indent := lipgloss.Width(number) + 1
+		for j, line := range splitVerseLines(module.ParseMarkup(verse.Text)) {
+			for k, wrapped := range wrapRuns(line, m.width-indent) {
+				text := m.renderRuns(wrapped)
+				if j == 0 && k == 0 {
+					text = numStyle.Render(number) + " " + text
+				} else {
+					text = strings.Repeat(" ", indent) + text
 				}
-				line = style.Render(strconv.Itoa(verse.Number)) + " " + line
+				out.lines = append(out.lines, text)
 			}
-			out.lines = append(out.lines, line)
 		}
 		if i == m.cursor {
 			out.to = len(out.lines) - 1
 		}
 	}
 	return out
+}
+
+// chapterHeading is the line that opens a Chapter: its number, centred and
+// highlighted in the Book's classification color. It is empty before the reader
+// opens a Book.
+func (m Model) chapterHeading() string {
+	if m.book.Number == 0 || m.width <= 0 {
+		return ""
+	}
+	tab := m.styles.bookTab(m.book.Number).Render(" " + fmt.Sprintf(m.translate("Chapter %d"), m.chapter) + " ")
+	return center(tab, m.width)
+}
+
+// chapterSubheadings is the current Chapter's Subheadings keyed by the Verse each
+// one introduces.
+func (m Model) chapterSubheadings() map[int][]module.Subheading {
+	if m.text == nil {
+		return nil
+	}
+	byVerse := make(map[int][]module.Subheading)
+	for _, subheading := range m.text.Subheadings(m.book.Number, m.chapter) {
+		byVerse[subheading.Verse] = append(byVerse[subheading.Verse], subheading)
+	}
+	return byVerse
+}
+
+// center pads text with spaces so it sits in the middle of width cells.
+func center(text string, width int) string {
+	pad := (width - lipgloss.Width(text)) / 2
+	if pad < 1 {
+		return text
+	}
+	spaces := strings.Repeat(" ", pad)
+	return spaces + text + spaces
 }
 
 // window is the lines to display and the first-line offset, clamped so the
