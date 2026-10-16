@@ -524,7 +524,12 @@ func (m Model) referencePickerView() string {
 		b.WriteString(m.styles.warning.Render(m.picker.err))
 		b.WriteString("\n")
 	}
-	b.WriteString(m.styles.label.Render(m.referenceHint()))
+	hint, outOfRange := m.referenceLine()
+	style := m.styles.label
+	if outOfRange { // flagged while it is typed, without waiting for Enter
+		style = m.styles.warning
+	}
+	b.WriteString(style.Render(hint))
 	if rows := m.pickerRowLines(); rows != "" {
 		b.WriteString("\n\n" + rows)
 	}
@@ -534,51 +539,87 @@ func (m Model) referencePickerView() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-// referenceHint is what the Reference modal says the input may be: the range of
-// Chapters of the Book it names, or that Chapter's range of Verses once the
-// Chapter is closed with a separator, and the accepted shapes while it names no
-// Book.
-func (m Model) referenceHint() string {
+// referenceLine is what the Reference modal says the input may be — the accepted
+// shapes while no Book is named, the Book's range of Chapters, or a closed
+// Chapter's range of Verses — and whether the input has written a number the Book
+// does not have, which the modal flags while it is typed rather than on Enter.
+func (m Model) referenceLine() (line string, outOfRange bool) {
 	book, location := module.SplitReference(m.picker.query)
 	named, ok := m.namedBook(book)
 	if !ok {
-		return m.translate("For example: John, John 3, John 3:16")
+		return m.translate("For example: John, John 3, John 3:16"), false
 	}
-	if chapter, closed := chapterTyped(m.picker.query, location); closed && chapter <= named.Chapters {
-		if verses := m.text.Chapter(named.Number, chapter); len(verses) > 0 {
-			return fmt.Sprintf("%s %d:1..%d", named.Name, chapter, verses[len(verses)-1].Number)
-		}
+
+	chapters := fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
+	typed := readLocation(m.picker.query, location)
+	if !typed.written {
+		return chapters, false
 	}
-	return fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
+	if typed.chapter < 1 || typed.chapter > named.Chapters {
+		return chapters, true
+	}
+
+	verses := m.text.Chapter(named.Number, typed.chapter)
+	last := 0
+	if len(verses) > 0 {
+		last = verses[len(verses)-1].Number
+	}
+	versesOfChapter := fmt.Sprintf("%s %d:1..%d", named.Name, typed.chapter, last)
+	switch {
+	case last == 0: // a Chapter the Module carries no Verse for is nowhere to go
+		return chapters, true
+	case typed.hasVerse && (typed.verse < 1 || typed.verse > last):
+		return versesOfChapter, true
+	case typed.closed:
+		return versesOfChapter, false
+	}
+	return chapters, false
 }
 
-// chapterTyped is the Chapter the input opens its location with, and whether the
-// reader has typed past it: a separator after the digits closes the Chapter, so
-// "3:16", "3." and "3 " name the Verses of Chapter 3 while a bare "3" may still
-// grow into 33. The input either still ends on the Chapter's digits, or on the
-// separator that closed them — the space included, which is gone from the
-// location the moment it is split off.
-func chapterTyped(query, location string) (chapter int, closed bool) {
+// typedLocation is how far the Reference modal's input has read into a location:
+// the Chapter it wrote, the Verse after it, and whether a separator closed the
+// Chapter. The zero value is an input that wrote no location at all.
+type typedLocation struct {
+	chapter  int
+	verse    int
+	written  bool // the input wrote a Chapter
+	closed   bool // a separator closed that Chapter, so it cannot grow
+	hasVerse bool
+}
+
+// readLocation reads the location the input has written so far. It reads past a
+// separator with nothing behind it, so "3:" closes Chapter 3 while the reader is
+// still on their way to a Verse, and past a separator the split cannot keep: the
+// space between a Chapter and its Verse.
+func readLocation(query, location string) typedLocation {
 	digits := 0
-	for digits < len(location) && location[digits] >= '0' && location[digits] <= '9' {
+	for digits < len(location) && isDigit(location[digits]) {
 		digits++
 	}
-	value, err := strconv.Atoi(location[:digits])
+	chapter, err := strconv.Atoi(location[:digits])
 	if err != nil {
-		return 0, false
+		return typedLocation{}
 	}
-	return value, digits < len(location) || !endsWithDigit(query)
+
+	typed := typedLocation{chapter: chapter, written: true}
+	rest := location[digits:]
+	typed.closed = rest != "" || !endsWithDigit(query)
+	if typed.closed {
+		if verse, err := strconv.Atoi(strings.TrimLeft(rest, ":,. ")); err == nil {
+			typed.verse, typed.hasVerse = verse, true
+		}
+	}
+	return typed
 }
 
 // endsWithDigit reports whether the input ends on a digit, the one sign that its
 // Chapter is still being written.
 func endsWithDigit(text string) bool {
-	if text == "" {
-		return false
-	}
-	last := text[len(text)-1]
-	return last >= '0' && last <= '9'
+	return text != "" && isDigit(text[len(text)-1])
 }
+
+// isDigit reports whether b is one of the ASCII digits.
+func isDigit(b byte) bool { return b >= '0' && b <= '9' }
 
 // windowStart is the first row of a window of rows lines that keeps the cursor
 // visible inside a list of total rows.

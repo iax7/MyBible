@@ -388,6 +388,38 @@ func TestTheReferenceViewKeepsTheRangeOfARejectedVerse(t *testing.T) {
 	}
 }
 
+// A number the Book does not have turns the range line red while it is typed, and
+// a number it does have does not.
+func TestTheReferenceViewFlagsANumberTheBookLacks(t *testing.T) {
+	cases := []struct {
+		typed, rangeText string
+		outOfRange       bool
+	}{
+		{"gen 50", "Genesis 1..3", true}, // the fixture's Genesis has 3 Chapters
+		{"gen 0", "Genesis 1..3", true},
+		{"gen 3:999", "Genesis 3:1..2", true}, // Chapter 3 has 2 Verses
+		{"gen 3:0", "Genesis 3:1..2", true},
+		{"gen 3", "Genesis 1..3", false},
+		{"gen 3:2", "Genesis 3:1..2", false},
+	}
+	for _, c := range cases {
+		m := navReader(t)
+		m, _ = send(t, m, press('v', "v", 0))
+		m = typeKey(t, m, c.typed)
+
+		raw := m.View().Content
+		if got := strings.Contains(raw, m.styles.warning.Render(c.rangeText)); got != c.outOfRange {
+			t.Errorf("%q: flagged = %v, want %v\n%s", c.typed, got, c.outOfRange, ansi.ReplaceAllString(raw, ""))
+		}
+		if c.outOfRange {
+			continue
+		}
+		if !strings.Contains(raw, m.styles.label.Render(c.rangeText)) {
+			t.Errorf("%q: a number the Book has is not left alone\n%s", c.typed, ansi.ReplaceAllString(raw, ""))
+		}
+	}
+}
+
 func TestTheReferencePickerRejectsMalformedInput(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
