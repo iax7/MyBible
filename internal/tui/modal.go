@@ -51,6 +51,7 @@ type pickerItem struct {
 	head   string
 	short  string
 	style  lipgloss.Style
+	group  string // the day heading this row belongs under, when the list is grouped by day
 }
 
 // pickerSpec is everything that differs between modals: the heading, where the
@@ -211,13 +212,14 @@ var pickers = [...]pickerSpec{
 		items: func(m Model) []pickerItem {
 			items := make([]pickerItem, 0, len(m.history))
 			for i := len(m.history) - 1; i >= 0; i-- { // most recent first
-				reference := m.history[i].String()
+				reference := m.history[i].Reference
 				items = append(items, pickerItem{
-					label:  reference,
-					search: reference,
+					label:  reference.String(),
+					search: reference.String(),
 					value:  i,
-					head:   m.history[i].Book.Name,
-					style:  m.styles.book(m.history[i].Book.Number),
+					head:   reference.Book.Name,
+					style:  m.styles.book(reference.Book.Number),
+					group:  m.historyDay(m.history[i].At),
 				})
 			}
 			return items
@@ -228,7 +230,6 @@ var pickers = [...]pickerSpec{
 			}
 			return m.translate("No matches")
 		},
-		confirm: func(m Model, value int) Model { return m.jumpToHistory(value) },
 	},
 	pickerLog: {
 		title: logTitle,
@@ -347,6 +348,9 @@ func (m Model) pickerConfirm() Model {
 	spec := pickers[m.picker.kind]
 	if m.picker.kind == pickerReference {
 		return m.confirmReference()
+	}
+	if m.picker.kind == pickerHistory {
+		return m.confirmHistory()
 	}
 
 	items := m.pickerMatches()
@@ -538,6 +542,9 @@ func (m Model) pickerView() string {
 		b.WriteString("\n\n")
 	}
 	b.WriteString(m.pickerRowLines())
+	if m.picker.err != "" {
+		b.WriteString("\n" + m.styles.warning.Render(m.picker.err))
+	}
 	b.WriteString("\n" + m.styles.hint.Render(m.translate(keyEnter+" to select")))
 
 	return m.styles.frameBox(m.pickerTitle(), keyClose, strings.TrimRight(b.String(), "\n"))
@@ -555,18 +562,70 @@ func (m Model) pickerRowLines() string {
 	if len(matches) == 0 {
 		return m.styles.label.Render(m.pickerEmptyMessage()) + "\n"
 	}
+	if m.picker.kind == pickerHistory {
+		return m.historyRowLines(matches)
+	}
 
 	var b strings.Builder
 	rows, start := m.pickerRows(), windowStart(m.picker.cursor, len(matches), m.pickerRows())
 	for i := start; i < len(matches) && i < start+rows; i++ {
-		line := truncate(matches[i].label, m.width-10)
-		if i == m.picker.cursor {
-			b.WriteString(m.styles.key.Render("> ") + m.pickerLabel(matches[i], line, true) + "\n")
-		} else {
-			b.WriteString("  " + m.pickerLabel(matches[i], line, false) + "\n")
-		}
+		b.WriteString(m.pickerRow(matches[i], i == m.picker.cursor) + "\n")
 	}
 	return b.String()
+}
+
+// historyRowLines renders the History rows with a day heading above the first
+// visible Visit of each day. Headings take lines too, so the window is measured
+// in lines rather than rows; the cursor's own row always stays in view.
+func (m Model) historyRowLines(matches []pickerItem) string {
+	start, end := m.historyWindow(matches)
+	var b strings.Builder
+	last := ""
+	for i := start; i < end; i++ {
+		if matches[i].group != last {
+			b.WriteString(m.styles.label.Render(truncate(matches[i].group, m.width-10)) + "\n")
+			last = matches[i].group
+		}
+		b.WriteString(m.pickerRow(matches[i], i == m.picker.cursor) + "\n")
+	}
+	return b.String()
+}
+
+// historyWindow is the first and past-last row of History that fit above the
+// modal's frame, day headings included, around the cursor.
+func (m Model) historyWindow(matches []pickerItem) (int, int) {
+	budget := m.pickerRows()
+	start, end := m.picker.cursor, m.picker.cursor+1
+	for start > 0 && historyLines(matches, start-1, end) <= budget {
+		start--
+	}
+	for end < len(matches) && historyLines(matches, start, end+1) <= budget {
+		end++
+	}
+	return start, end
+}
+
+// historyLines is how many screen lines the rows in [start, end) need, counting
+// a heading wherever the day changes.
+func historyLines(matches []pickerItem, start, end int) int {
+	lines, last := 0, ""
+	for i := start; i < end; i++ {
+		if matches[i].group != last {
+			lines++
+			last = matches[i].group
+		}
+		lines++
+	}
+	return lines
+}
+
+// pickerRow is one rendered row, marked when it is the cursor's.
+func (m Model) pickerRow(item pickerItem, cursor bool) string {
+	line := truncate(item.label, m.width-10)
+	if cursor {
+		return m.styles.key.Render("> ") + m.pickerLabel(item, line, true)
+	}
+	return "  " + m.pickerLabel(item, line, false)
 }
 
 // pickerLabel renders one row. A Book row colors its abbreviation and its name

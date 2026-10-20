@@ -152,6 +152,11 @@ var legacyNumbers = map[int]int{
 	200: 462, // 1 Maccabees
 }
 
+// BookByNumber resolves a MyBible book_number to a Canonical Book, tolerating
+// numbers that changed across format revisions. State files refer to Books by
+// number, so they keep working across Translations.
+func BookByNumber(number int) (Book, bool) { return canonicalBook(number) }
+
 // canonicalBook resolves a Module's book_number to a Canonical Book, tolerating
 // numbers that changed across format revisions.
 func canonicalBook(number int) (Book, bool) {

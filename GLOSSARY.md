@@ -49,9 +49,21 @@ _Avoid_: Current version, selected module
 The filesystem folder scanned at startup for Modules. Overridable in config; when config names no folder the reader falls back to its own default.
 _Avoid_: Library, module path, store
 
+**Visit**:
+One Reference reached by a deliberate jump — a Book, a Chapter, a Reference, a Search result, or a History entry. Moving the cursor or stepping a Chapter is not a Visit.
+_Avoid_: Search, hit, step
+
 **History**:
-The back/forward stack of visited References, plus the last-read position restored on open.
+The Visits kept across restarts, grouped by day, that the reader can return to.
 _Avoid_: Log, recents
+
+**Trail**:
+The Visits of the current session in the order they happened, retraced with back and forward. It does not survive a restart.
+_Avoid_: Stack, history
+
+**Last-read position**:
+The Reference of the cursor when the reader quits, restored on the next open.
+_Avoid_: Last reference, bookmark
 
 **Log**:
 The warnings the reader collected — Modules it could not read, state it could not save — shown in a modal of their own.

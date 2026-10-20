@@ -4,6 +4,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -156,14 +157,18 @@ type Model struct {
 	picker  choice
 	results []module.Result // the Search modal's current hits
 
-	history  []module.Reference // visited References in visit order
-	position int                // index into history of the current Reference
+	trail    []module.Reference // the session's Visits in visit order
+	position int                // index into trail of the current Reference
+
+	history       []visit // Visits kept across restarts, in visit order
+	historyFailed bool    // a History read or write failed: warn once, not on every jump
+	now           func() time.Time
 }
 
 // New returns a Model after loading config and scanning the Module directory.
 // Problems are reported as warnings in the view rather than as errors.
 func New(opts Options) Model {
-	m := Model{showBar: true, configDir: opts.ConfigDir}
+	m := Model{showBar: true, configDir: opts.ConfigDir, now: time.Now}
 	if m.configDir == "" {
 		if dir, err := config.Dir(); err == nil {
 			m.configDir = dir
@@ -177,6 +182,7 @@ func New(opts Options) Model {
 	m.cfg = cfg
 	m.lang = resolveLanguage(cfg.Language)
 	m.styles = newStyles(paletteFor(cfg.Theme, cfg.Colors), bookColorsFor(cfg.Theme))
+	m = m.loadHistory()
 
 	m.moduleDir = opts.ModuleDir
 	if m.moduleDir == "" {

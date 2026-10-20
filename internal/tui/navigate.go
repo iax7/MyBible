@@ -204,7 +204,7 @@ func (m Model) moveChapter(delta int) Model {
 	chapter := m.chapter + delta
 	for {
 		if chapter >= 1 && chapter <= books[i].Chapters {
-			next, _ := m.jumpAndRecord(module.Reference{Book: books[i], Chapter: chapter})
+			next, _ := m.jumpTo(module.Reference{Book: books[i], Chapter: chapter})
 			return next
 		}
 		i += delta
@@ -269,7 +269,7 @@ func (m Model) jumpAndRecord(reference module.Reference) (Model, bool) {
 		return m, false
 	}
 	if had {
-		next = next.recordHistory(previous)
+		next = next.recordTrail(previous)
 	}
-	return next, true
+	return next.recordVisit(), true
 }
