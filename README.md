@@ -10,7 +10,7 @@ settling, so there are no published binaries yet.
 
 ## Build and run
 
-Requires Go 1.24 or newer (the exact version is pinned in `mise.toml`).
+Requires the Go toolchain pinned in `mise.toml` (1.27.2, the same floor `go.mod` sets).
 
 ```sh
 go build ./cmd/mybible
