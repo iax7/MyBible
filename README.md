@@ -10,7 +10,7 @@ settling, so there are no published binaries yet.
 
 ## Build and run
 
-Requires the Go toolchain pinned in `mise.toml` (1.27.2, the same floor `go.mod` sets).
+Requires Go 1.27.2 or newer: the floor `go.mod` sets, and the 1.27 line `mise.toml` installs.
 
 ```sh
 go build ./cmd/mybible
@@ -27,6 +27,8 @@ go build ./cmd/mybible
 | `c` | Chapter |
 | `v` | Go To |
 | `t` | Translation |
+| `m` | Commentary |
+| `Enter` | Open commentary |
 | `/` | Search |
 | `H` | History |
 | `L` | Log (only when there are warnings) |
@@ -46,6 +48,11 @@ and mostly not redistributable, so no module file belongs in this repository.
 Subheadings are read too: a `subheadings` module named after its Bible
 (`RV60-s.subheadings.SQLite3` belongs to `RV60.SQLite3`) is paired with it
 automatically, and its headings render above the verses they introduce.
+
+Commentary modules are found by their declared type, not by file name: every
+module the file calls a `commentaries` module is offered under `m`, whichever
+Bible it was written for. The one you pick labels the verses it covers and opens
+in its own modal on `Enter`, with `Tab` to switch between modules.
 
 ## License
 
