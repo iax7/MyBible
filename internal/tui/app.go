@@ -26,6 +26,8 @@ var Commands = []Command{
 	{"c", "Chapter"},
 	{"v", "Go To"},
 	{"t", "Translation"},
+	{"m", "Commentary"},
+	{keyEnter, "Open commentary"},
 	{"/", "Search"},
 	{"H", "History"},
 	{keyLog, "Log"},
@@ -68,11 +70,13 @@ const (
 	keyChapter     = "c"
 	keyReference   = "v"
 	keyTranslation = "t"
+	keyCommentary  = "m"
 	keySearch      = "/"
 	keyHistory     = "H"
 	keyLog         = "L"
 	keyEnter       = "enter"
 	keyTab         = "tab"
+	keyPrevTab     = "shift+tab"
 	keyClose       = "esc"
 	keyUp          = "up"
 	keyDown        = "down"
@@ -100,12 +104,14 @@ const (
 // Modal titles.
 const (
 	selectTranslation = "Select Translation"
+	selectCommentary  = "Select Commentary"
 	selectBook        = "Select Book"
 	selectChapter     = "Select Chapter"
 	selectReference   = "Go to Reference"
 	searchTitle       = "Search"
 	historyTitle      = "History"
 	logTitle          = "Log"
+	commentaryTitle   = "Commentary"
 )
 
 const emptyReference = "—"
@@ -143,6 +149,11 @@ type Model struct {
 	translations []module.Translation
 	active       string
 	warnings     []string
+
+	commentaries     []module.Commentary
+	activeCommentary string
+	commentary       commentaryChapter // the Active commentary's rows for the current Chapter
+	commentaryModal  commentaryModal
 
 	cfg    config.Config // the loaded config, kept so saving state does not drop keys
 	lang   lang
@@ -200,6 +211,18 @@ func New(opts Options) Model {
 		translations, warnings := module.Discover(m.moduleDir)
 		m.translations = translations
 		m.warnings = append(m.warnings, warnings...)
+
+		commentaries, warnings := module.DiscoverCommentaries(m.moduleDir)
+		m.commentaries = commentaries
+		m.warnings = append(m.warnings, warnings...)
+	}
+
+	m.activeCommentary = cfg.ActiveCommentary
+	if _, ok := m.activeCommentaryModule(); !ok {
+		m.activeCommentary = ""
+		if len(m.commentaries) > 0 {
+			m.activeCommentary = m.commentaries[0].Abbreviation
+		}
 	}
 
 	m.active = cfg.ActiveTranslation
@@ -220,6 +243,7 @@ func New(opts Options) Model {
 // the reader at its first Chapter. A load failure is a warning, not a crash.
 func (m Model) loadActive() Model {
 	m.text, m.book, m.chapter, m.cursor, m.top = nil, module.Book{}, 0, 0, 0
+	m.commentary = commentaryChapter{}
 	t, ok := m.activeTranslation()
 	if !ok {
 		return m
@@ -233,7 +257,7 @@ func (m Model) loadActive() Model {
 	if books := text.Books(); len(books) > 0 {
 		m.book, m.chapter = books[0], 1
 	}
-	return m
+	return m.loadCommentary()
 }
 
 // Init implements tea.Model.
@@ -244,6 +268,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.commentaryModal.open {
+			m = m.openCommentaryAt(m.commentaryModal.reference)
+		}
 
 	case tea.KeyPressMsg:
 		key := msg.String()
@@ -255,6 +282,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.help = false
 			}
 			return m, nil
+		}
+		if m.commentaryModal.open {
+			return m.updateCommentary(msg)
 		}
 		if m.picker.isOpen() {
 			return m.updatePicker(msg)
@@ -274,6 +304,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openPicker(pickerReference)
 		case keyTranslation:
 			m = m.openPicker(pickerTranslation)
+		case keyCommentary:
+			m = m.openPicker(pickerCommentary)
+		case keyEnter:
+			m = m.openCommentary()
 		case keySearch:
 			m = m.openPicker(pickerSearch)
 		case keyHistory:
@@ -318,6 +352,7 @@ func (m Model) persist() Model {
 	cfg := m.cfg
 	cfg.ModuleDir = m.moduleDir
 	cfg.ActiveTranslation = m.active
+	cfg.ActiveCommentary = m.activeCommentary
 	cfg.LastReference = ""
 	if reference, ok := m.currentReference(); ok {
 		cfg.LastReference = reference.String()
@@ -358,6 +393,8 @@ func (m Model) modalView() string {
 	switch {
 	case m.help:
 		return m.helpView()
+	case m.commentaryModal.open:
+		return m.commentaryView()
 	case m.picker.isOpen():
 		return m.pickerView()
 	}

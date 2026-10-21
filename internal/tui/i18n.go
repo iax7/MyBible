@@ -18,21 +18,23 @@ const (
 // falls back to English with no separate string table.
 var spanish = map[string]string{
 	// Top bar and Help modal.
-	"Book":           "Libro",
-	"Chapter":        "Capítulo",
-	"Go To":          "Ir a",
-	"Translation":    "Traducción",
-	"Search":         "Buscar",
-	"History":        "Historial",
-	"Help":           "Ayuda",
-	"Quit":           "Salir",
-	"Keys":           "Teclas",
-	"Movement":       "Movimiento",
-	"Commands":       "Comandos",
-	"Back":           "Atrás",
-	"Forward":        "Adelante",
-	"Toggle top bar": "Mostrar u ocultar la barra",
-	"Close":          "Cerrar",
+	"Book":            "Libro",
+	"Chapter":         "Capítulo",
+	"Go To":           "Ir a",
+	"Translation":     "Traducción",
+	"Commentary":      "Comentario",
+	"Open commentary": "Abrir comentario",
+	"Search":          "Buscar",
+	"History":         "Historial",
+	"Help":            "Ayuda",
+	"Quit":            "Salir",
+	"Keys":            "Teclas",
+	"Movement":        "Movimiento",
+	"Commands":        "Comandos",
+	"Back":            "Atrás",
+	"Forward":         "Adelante",
+	"Toggle top bar":  "Mostrar u ocultar la barra",
+	"Close":           "Cerrar",
 
 	// Movement keys, shown in the Help modal.
 	"Verse down":        "Versículo abajo",
@@ -46,6 +48,7 @@ var spanish = map[string]string{
 
 	// Modal titles.
 	"Select Translation": "Seleccionar traducción",
+	"Select Commentary":  "Seleccionar comentario",
 	"Select Book":        "Seleccionar libro",
 	"Select Chapter":     "Seleccionar capítulo",
 	"Go to Reference":    "Ir a la referencia",
@@ -54,6 +57,10 @@ var spanish = map[string]string{
 	// Modal bodies.
 	"Type to search":                       "Escribe para buscar",
 	"Nothing visited yet":                  "Aún no has visitado nada",
+	"No commentaries":                      "Sin comentarios",
+	"Chapter overview":                     "Resumen del capítulo",
+	"end":                                  "final",
+	"tab to switch · j/k to scroll":        "tab para cambiar · j/k para desplazar",
 	"Today":                                "Hoy",
 	"Yesterday":                            "Ayer",
 	"No matches":                           "Sin resultados",

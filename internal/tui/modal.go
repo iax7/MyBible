@@ -17,6 +17,7 @@ type pickerKind int
 const (
 	pickerNone pickerKind = iota
 	pickerTranslation
+	pickerCommentary
 	pickerBook
 	pickerChapter
 	pickerReference
@@ -144,6 +145,38 @@ var pickers = [...]pickerSpec{
 			if value >= 0 && value < len(m.translations) {
 				m.active = m.translations[value].Abbreviation
 				m = m.loadActive()
+				m = m.persist()
+			}
+			return m
+		},
+	},
+	pickerCommentary: {
+		title:  selectCommentary,
+		filter: true,
+		items: func(m Model) []pickerItem {
+			items := make([]pickerItem, 0, len(m.commentaries))
+			for i, commentary := range m.commentaries {
+				items = append(items, pickerItem{
+					label:  pad(commentary.Abbreviation, 10) + commentary.Title,
+					search: commentary.Abbreviation + " " + commentary.Title,
+					value:  i,
+				})
+			}
+			return items
+		},
+		cursor: func(m Model) int {
+			for i, commentary := range m.commentaries {
+				if commentary.Abbreviation == m.activeCommentary {
+					return i
+				}
+			}
+			return 0
+		},
+		empty: func(m Model) string { return m.translate("No commentaries") },
+		confirm: func(m Model, value int) Model {
+			if value >= 0 && value < len(m.commentaries) {
+				m.activeCommentary = m.commentaries[value].Abbreviation
+				m = m.loadCommentary()
 				m = m.persist()
 			}
 			return m

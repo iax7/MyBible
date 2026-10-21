@@ -121,6 +121,38 @@ func Subheadings(t testing.TB, dir, filename string, info map[string]string, sub
 	return Create(t, dir, filename, statements...)
 }
 
+// Commentary is one row of a synthetic Commentary Module.
+type Commentary struct {
+	Book        int
+	ChapterFrom int
+	VerseFrom   int
+	ChapterTo   int
+	VerseTo     int
+	Text        string
+	NullEnd     bool // write the end as NULL, the way some Modules do
+}
+
+// Commentaries makes a Commentary Module named filename inside dir with the
+// standard tables, the given info key/value pairs, and the given rows.
+func Commentaries(t testing.TB, dir, filename string, info map[string]string, rows []Commentary) string {
+	t.Helper()
+
+	statements := []string{
+		`CREATE TABLE info (name TEXT, value TEXT)`,
+		`CREATE TABLE commentaries (book_number NUMERIC, chapter_number_from NUMERIC, verse_number_from NUMERIC, chapter_number_to NUMERIC, verse_number_to NUMERIC, marker TEXT, text TEXT NOT NULL DEFAULT '', PRIMARY KEY (book_number, chapter_number_from, verse_number_from, marker))`,
+	}
+	statements = append(statements, infoStatements(info)...)
+	for i, row := range rows {
+		end := itoa(row.ChapterTo) + ", " + itoa(row.VerseTo)
+		if row.NullEnd {
+			end = "NULL, NULL"
+		}
+		statements = append(statements, "INSERT INTO commentaries (book_number, chapter_number_from, verse_number_from, chapter_number_to, verse_number_to, marker, text) VALUES ("+
+			itoa(row.Book)+", "+itoa(row.ChapterFrom)+", "+itoa(row.VerseFrom)+", "+end+", "+quote(itoa(i))+", "+quote(row.Text)+")")
+	}
+	return Create(t, dir, filename, statements...)
+}
+
 // infoStatements turns the info key/value pairs into INSERT statements.
 func infoStatements(info map[string]string) []string {
 	statements := make([]string, 0, len(info))

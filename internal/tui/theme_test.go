@@ -116,6 +116,24 @@ func TestAThemeColorOverrideWins(t *testing.T) {
 	}
 }
 
+// The Commentary's bold text is the theme's white, and its verse links the
+// theme's green underline; only the link color is configurable.
+func TestTheCommentaryBoldAndLinksFollowTheTheme(t *testing.T) {
+	dark := themedReader(t, "dark", config.Colors{})
+	bold := dark.styles.commentaryBold.Render("x")
+	if !strings.Contains(bold, "38;2;255;255;255") || !strings.Contains(bold, "48;2;42;42;42") {
+		t.Errorf("the dark theme's commentary bold is not white on its band: %q", bold)
+	}
+	if got := dark.styles.link.Render("x"); !strings.Contains(got, "38;2;150;220;90") || !dark.styles.link.GetUnderline() {
+		t.Errorf("the dark theme's link is not the green underline: %q", got)
+	}
+
+	overridden := themedReader(t, "light", config.Colors{Link: "9"})
+	if got := overridden.styles.link.Render("x"); !strings.Contains(got, "91") {
+		t.Errorf("the link color override was ignored: %q", got)
+	}
+}
+
 // The hint is the modal's own footer: a quiet grey, not the body text's color.
 func TestTheModalFooterTakesTheHintColor(t *testing.T) {
 	m := themedReader(t, "dark", config.Colors{Hint: "9"})

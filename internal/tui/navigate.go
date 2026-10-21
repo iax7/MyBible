@@ -57,6 +57,7 @@ func (m Model) renderLines() chapterLines {
 		out.lines = append(out.lines, heading)
 	}
 	subheadings := m.chapterSubheadings()
+	labels := m.commentaryLabels()
 	for i, verse := range m.chapterVerses() {
 		if i == m.cursor {
 			out.from = len(out.lines)
@@ -80,6 +81,9 @@ func (m Model) renderLines() chapterLines {
 				}
 				out.lines = append(out.lines, text)
 			}
+		}
+		if labels[verse.Number] {
+			out.lines = m.appendCommentaryLabel(out.lines, indent)
 		}
 		if i == m.cursor {
 			out.to = len(out.lines) - 1
@@ -256,6 +260,7 @@ func (m Model) jumpTo(reference module.Reference) (Model, bool) {
 		}
 	}
 	m.book, m.chapter, m.cursor, m.top = book, reference.Chapter, cursor, 0
+	m = m.loadCommentary()
 	return m.ensureVisible(), true
 }
 

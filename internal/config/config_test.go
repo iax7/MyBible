@@ -21,10 +21,11 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 	want := Config{
 		ModuleDir:         "/home/me/modules",
 		ActiveTranslation: "RST",
+		ActiveCommentary:  "MAC",
 		LastReference:     "John 3:16",
 		Theme:             "light",
 		Language:          "es",
-		Colors:            Colors{Jesus: "9"},
+		Colors:            Colors{Jesus: "9", Link: "28"},
 	}
 
 	if err := Save(dir, want); err != nil {

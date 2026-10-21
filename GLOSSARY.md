@@ -37,6 +37,26 @@ One numbered unit of text within a Chapter. A Module stores exactly one row per 
 A short heading introducing the Verses that follow it, held in a Module of its own rather than in the Bible text.
 _Avoid_: Subtitle, section title, heading
 
+**Commentary**:
+What a Commentary module says about a Verse, a range of Verses, or a whole Chapter.
+_Avoid_: Note, footnote, annotation
+
+**Commentary module**:
+A Module of type commentaries: one edition's Commentary, read beside the Active translation and chosen by the reader rather than paired by file name.
+_Avoid_: Notes module, commentary translation
+
+**Active commentary**:
+The Commentary module whose label the reading pane shows and whose text the Commentary modal opens first. One at a time.
+_Avoid_: Selected commentary, current commentary
+
+**Commentary label**:
+The Active commentary's abbreviation, shown at the end of every Verse it covers.
+_Avoid_: Marker, badge, tag
+
+**Verse link**:
+A Reference written inside Commentary text, underlined and green so the reader can see it is a way to that Verse.
+_Avoid_: Cross-reference, citation, hyperlink
+
 **Reference**:
 The address of a Verse or a range of Verses — book, chapter, verse — used to name a location in navigation history and search results.
 _Avoid_: Citation, location, pointer

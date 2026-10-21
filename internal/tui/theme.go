@@ -10,38 +10,54 @@ import (
 )
 
 // Palette is the full set of colors a theme is built from: field for field the
-// reader's config colors. An empty field means the terminal's default color.
-type Palette = config.Colors
+// reader's config colors, plus the white a Commentary's bold text wears and the
+// band behind it, which follow the theme rather than the config. An empty field
+// means the terminal's default color.
+type Palette struct {
+	config.Colors
+	Bold     string
+	Emphasis string
+}
 
 // The built-in themes, selected by name in config. The dark theme is zellij's
 // built-in default palette (see ADR-0003), so the reader sits quietly inside the
 // terminal its maintainer already reads in.
 var (
 	darkPalette = Palette{
-		Bar:       "#0B0B0B",
-		BarText:   "#D7D7D7",
-		Key:       "#96DC5A",
-		Label:     "#D7D7D7",
-		Reference: "#D7D7D7",
-		Warning:   "#FF9146",
-		Jesus:     "#FF5F6E",
-		VerseNum:  "#898989",
-		CursorNum: "#96DC5A",
-		Hint:      "#6C6C6C",
-		Field:     "#2A2A2A",
+		Colors: config.Colors{
+			Bar:       "#0B0B0B",
+			BarText:   "#D7D7D7",
+			Key:       "#96DC5A",
+			Label:     "#D7D7D7",
+			Reference: "#D7D7D7",
+			Warning:   "#FF9146",
+			Jesus:     "#FF5F6E",
+			VerseNum:  "#898989",
+			CursorNum: "#96DC5A",
+			Hint:      "#6C6C6C",
+			Field:     "#2A2A2A",
+			Link:      "#96DC5A",
+		},
+		Bold:     "#FFFFFF",
+		Emphasis: "#2A2A2A",
 	}
 	lightPalette = Palette{
-		Bar:       "189",
-		BarText:   "235",
-		Key:       "25",
-		Label:     "240",
-		Reference: "236",
-		Warning:   "130",
-		Jesus:     "160",
-		VerseNum:  "245",
-		CursorNum: "25",
-		Hint:      "248",
-		Field:     "253",
+		Colors: config.Colors{
+			Bar:       "189",
+			BarText:   "235",
+			Key:       "25",
+			Label:     "240",
+			Reference: "236",
+			Warning:   "130",
+			Jesus:     "160",
+			VerseNum:  "245",
+			CursorNum: "25",
+			Hint:      "248",
+			Field:     "253",
+			Link:      "28",
+		},
+		Bold:     "16",
+		Emphasis: "253",
 	}
 )
 
@@ -111,30 +127,33 @@ func paletteFor(theme string, overrides config.Colors) Palette {
 	set(&p.CursorNum, overrides.CursorNum)
 	set(&p.Hint, overrides.Hint)
 	set(&p.Field, overrides.Field)
+	set(&p.Link, overrides.Link)
 	return p
 }
 
 // styles are every style the reader draws with, derived from one theme so no
 // file needs its own color literal.
 type styles struct {
-	bar        lipgloss.Style
-	barColor   string // the bar's own color: a filled Book tab and the Chapter heading draw their text in it
-	key        lipgloss.Style
-	label      lipgloss.Style
-	reference  lipgloss.Style
-	warning    lipgloss.Style
-	invalid    lipgloss.Style
-	frame      lipgloss.Style
-	italics    lipgloss.Style
-	jesus      lipgloss.Style
-	verseNum   lipgloss.Style
-	cursorNum  lipgloss.Style
-	hint       lipgloss.Style
-	field      lipgloss.Style // the Reference modal's input line, a filled band that marks where typing lands
-	popup      lipgloss.Style // the Reference modal's completion menu
-	popupKey   lipgloss.Style // the menu's highlighted row
-	subheading lipgloss.Style
-	bookColor  bookPalette
+	bar            lipgloss.Style
+	barColor       string // the bar's own color: a filled Book tab and the Chapter heading draw their text in it
+	key            lipgloss.Style
+	label          lipgloss.Style
+	reference      lipgloss.Style
+	warning        lipgloss.Style
+	invalid        lipgloss.Style
+	frame          lipgloss.Style
+	italics        lipgloss.Style
+	jesus          lipgloss.Style
+	verseNum       lipgloss.Style
+	cursorNum      lipgloss.Style
+	hint           lipgloss.Style
+	field          lipgloss.Style // the Reference modal's input line, a filled band that marks where typing lands
+	popup          lipgloss.Style // the Reference modal's completion menu
+	popupKey       lipgloss.Style // the menu's highlighted row
+	subheading     lipgloss.Style
+	commentaryBold lipgloss.Style // the Commentary's <b> text: bold white on a quiet band
+	link           lipgloss.Style // a Commentary's verse link: green and underlined
+	bookColor      bookPalette
 }
 
 // newStyles builds the rendered styles from a Palette and its book colors.
@@ -157,7 +176,11 @@ func newStyles(p Palette, bookColors bookPalette) styles {
 		popup:      lipgloss.NewStyle().Background(lipgloss.Color(p.Bar)).Foreground(lipgloss.Color(p.BarText)),
 		popupKey:   lipgloss.NewStyle().Background(lipgloss.Color(p.Bar)).Foreground(lipgloss.Color(p.Key)).Bold(true),
 		subheading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Key)),
-		bookColor:  bookColors,
+		commentaryBold: lipgloss.NewStyle().Bold(true).
+			Foreground(lipgloss.Color(p.Bold)).
+			Background(lipgloss.Color(p.Emphasis)),
+		link:      lipgloss.NewStyle().Foreground(lipgloss.Color(p.Link)).Underline(true),
+		bookColor: bookColors,
 	}
 }
 

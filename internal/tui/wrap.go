@@ -44,16 +44,16 @@ func wrapRuns(runs []module.Run, width int) [][]module.Run {
 	var line []module.Run
 	lineWidth := 0
 	for _, word := range splitWords(runs) {
-		wordWidth := runWidth(word)
+		wordWidth := runWidth(word.runs)
 		if len(line) > 0 && lineWidth+1+wordWidth > width {
 			lines = append(lines, line)
 			line, lineWidth = nil, 0
 		}
 		if len(line) > 0 {
-			line = appendRun(line, module.Run{Text: " "})
+			line = appendRun(line, word.space)
 			lineWidth++
 		}
-		for _, run := range word {
+		for _, run := range word.runs {
 			line = appendRun(line, run)
 		}
 		lineWidth += wordWidth
@@ -61,15 +61,26 @@ func wrapRuns(runs []module.Run, width int) [][]module.Run {
 	return append(lines, line)
 }
 
+// splitWord is one word of a line and the whitespace before it. The whitespace
+// keeps its own style, so the spaces inside a link stay underlined when the
+// line is rejoined.
+type splitWord struct {
+	space module.Run
+	runs  []module.Run
+}
+
 // splitWords separates a line's Runs into words, dropping the whitespace between
 // them: a wrapped line rejoins its words with single spaces.
-func splitWords(runs []module.Run) [][]module.Run {
-	var words [][]module.Run
-	var word []module.Run
+func splitWords(runs []module.Run) []splitWord {
+	var words []splitWord
+	var word splitWord
+	var space module.Run
 	flush := func() {
-		if len(word) > 0 {
+		if len(word.runs) > 0 {
+			word.space = space
 			words = append(words, word)
-			word = nil
+			word = splitWord{}
+			space = module.Run{}
 		}
 	}
 	for _, run := range runs {
@@ -78,11 +89,12 @@ func splitWords(runs []module.Run) [][]module.Run {
 			if r != ' ' && r != '\t' && r != '\n' {
 				continue
 			}
-			word = appendRun(word, withText(run, run.Text[start:i]))
+			word.runs = appendRun(word.runs, withText(run, run.Text[start:i]))
 			flush()
+			space = withText(run, " ")
 			start = i + len(string(r))
 		}
-		word = appendRun(word, withText(run, run.Text[start:]))
+		word.runs = appendRun(word.runs, withText(run, run.Text[start:]))
 	}
 	flush()
 	return words
@@ -94,7 +106,8 @@ func appendRun(runs []module.Run, run module.Run) []module.Run {
 	if run.Text == "" {
 		return runs
 	}
-	if n := len(runs); n > 0 && runs[n-1].Italics == run.Italics && runs[n-1].Red == run.Red {
+	if n := len(runs); n > 0 && runs[n-1].Italics == run.Italics && runs[n-1].Red == run.Red &&
+		runs[n-1].Bold == run.Bold && runs[n-1].Link == run.Link {
 		runs[n-1].Text += run.Text
 		return runs
 	}
@@ -112,5 +125,5 @@ func runWidth(runs []module.Run) int {
 
 // withText is a Run's style carried onto a slice of its text.
 func withText(run module.Run, text string) module.Run {
-	return module.Run{Text: text, Italics: run.Italics, Red: run.Red}
+	return module.Run{Text: text, Italics: run.Italics, Red: run.Red, Bold: run.Bold, Link: run.Link}
 }

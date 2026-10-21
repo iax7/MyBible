@@ -23,6 +23,7 @@ const (
 type Config struct {
 	ModuleDir         string `toml:"module_directory"`
 	ActiveTranslation string `toml:"active_translation"`
+	ActiveCommentary  string `toml:"active_commentary"`
 	LastReference     string `toml:"last_reference"`
 	Theme             string `toml:"theme"`
 	Language          string `toml:"language"`
@@ -43,6 +44,7 @@ type Colors struct {
 	CursorNum string `toml:"cursor_num"`
 	Hint      string `toml:"hint"`
 	Field     string `toml:"field"`
+	Link      string `toml:"link"`
 }
 
 // Dir returns the directory holding the reader's configuration.

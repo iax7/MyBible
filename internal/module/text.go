@@ -273,12 +273,16 @@ func moduleBooks(db *sql.DB, tables map[string]bool) (map[int]Book, error) {
 	return books, rows.Err()
 }
 
-// Run is a stretch of Verse text sharing one display style. A break tag becomes
-// a Run whose Text is "\n" for <br/> or "\n\n" for <pb/>.
+// Run is a stretch of Verse or Commentary text sharing one display style. A
+// break tag becomes a Run whose Text is "\n" for <br/> or "\n\n" for <pb/>.
+// Bold marks Commentary text the Module emphasized; Link marks a verse link,
+// which the reader underlines so it can become clickable.
 type Run struct {
 	Text    string
 	Italics bool
 	Red     bool
+	Bold    bool
+	Link    bool
 }
 
 // strippedTags enclose content that 0.0.2 hides: Strong's numbers, morphology,
