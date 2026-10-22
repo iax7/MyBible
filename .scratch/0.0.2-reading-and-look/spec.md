@@ -21,12 +21,16 @@ colours clash with the terminal it lives in.
   it.
 - **Warnings** ("`Broken.SQLite3`: not a database") are appended to the bottom of
   the reading pane, where they look like part of the text and cannot be dismissed.
+- **Translator-inserted words** are italic but in the body's full colour, so they
+  compete with the original text; a printed Bible sets them in a quieter tone
+  because the translator supplied them.
 
 ## Solution
 
 Make the reading pane read like prose, show the Subheadings the user already has,
-adopt zellij's default theme for the bar and the modals, and move warnings into a
-Log modal reached from the bar.
+adopt zellij's default theme for the bar and the modals, set the translator's
+added words in a quieter tone, and move warnings into a Log modal reached from
+the bar.
 
 ## User Stories
 
@@ -47,6 +51,7 @@ Log modal reached from the bar.
 15. As a reader, I want `L` to open a Log modal listing every warning as a bullet, so that I can read what went wrong without leaving the reader.
 16. As a reader, I want the bar and the modals to keep working exactly as they do now, so that the new look costs me no keystrokes.
 17. As a reader, I want the interface in English and Spanish as before, so that the new strings read in both languages.
+18. As a reader, I want translator-inserted words in a quieter tone as well as italic, so that they read as supplied for clarity rather than as the original text.
 
 ## Implementation Decisions
 
@@ -60,6 +65,12 @@ Log modal reached from the bar.
   (translated), rendered with the Book's classification colour as its background
   and the bar's own colour as its foreground. It is a line of the Chapter like any
   other: it scrolls with the text and is not part of any Verse's cursor span.
+
+**Translator-inserted words.** `<i>` marks the words a Translation adds for
+clarity. They render italic in the theme's `italics` color — `#8C8C8C` in `dark`,
+`243` in `light` — overridable in config like every other color. Where `<i>` falls
+inside `<J>`, the quieter color wins: the added word is not the speaker's, so it is
+not red, while the red around it stays. Italics in Commentary text are untouched.
 
 **Subheadings.** A new Module type, `subheadings`, is discovered but not
 surfaced as a Translation. Its file name carries the abbreviation of the Bible it
@@ -101,8 +112,10 @@ state.
 
 - **TUI model.** A long Verse wraps and its continuation lines are indented; a
   Chapter opens with a centred heading; a Subheading renders above its Verse;
-  the top bar shows `Log` only with warnings; `L` opens the Log and lists the
-  warnings as bullets; the reading pane carries no warning text.
+  translator-inserted words render italic and quieter in both themes, including
+  inside the words of Jesus, and their color is overridable; the top bar shows
+  `Log` only with warnings; `L` opens the Log and lists the warnings as bullets;
+  the reading pane carries no warning text.
 - **Module reader.** A synthetic Subheadings Module loads and pairs with its
   Bible by abbreviation; a Translation with no companion loads without
   Subheadings; `<x>` content is hidden by `ParseMarkup`.

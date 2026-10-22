@@ -39,6 +39,7 @@ type Colors struct {
 	Label     string `toml:"label"`
 	Reference string `toml:"reference"`
 	Warning   string `toml:"warning"`
+	Italics   string `toml:"italics"`
 	Jesus     string `toml:"jesus"`
 	VerseNum  string `toml:"verse_num"`
 	CursorNum string `toml:"cursor_num"`

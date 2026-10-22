@@ -33,6 +33,10 @@ One numbered division of a Book.
 **Verse**:
 One numbered unit of text within a Chapter. A Module stores exactly one row per Verse.
 
+**Translator-inserted words**:
+Words a Translation supplies to the base text for clarity or grammar, marked in the Module by `<i>`. The reader shows them italic and in a quieter color, so they read as supplied rather than original.
+_Avoid_: Added text, italics, emphasis
+
 **Subheading**:
 A short heading introducing the Verses that follow it, held in a Module of its own rather than in the Bible text.
 _Avoid_: Subtitle, section title, heading

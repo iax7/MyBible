@@ -12,11 +12,18 @@ import (
 // with the given theme settings.
 func themedReader(t *testing.T, theme string, colors config.Colors) Model {
 	t.Helper()
+	return translatorReader(t, theme, colors, "and <J>Jesus wept</J>")
+}
+
+// translatorReader builds a reader whose only Verse carries the given text, so
+// a test can say what the translator's added words look like.
+func translatorReader(t *testing.T, theme string, colors config.Colors, text string) Model {
+	t.Helper()
 	dir := t.TempDir()
 	modtest.BibleAll(t, dir, "RST.SQLite3",
 		map[string]string{"description": "Reina-Valera 1909"},
 		genesis(),
-		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: "and <J>Jesus wept</J>"}})
+		[]modtest.Verse{{Book: 10, Chapter: 1, Verse: 1, Text: text}})
 	return configured(t, config.Config{ModuleDir: dir, ActiveTranslation: "RST", Theme: theme, Colors: colors})
 }
 
@@ -113,6 +120,44 @@ func TestAThemeColorOverrideWins(t *testing.T) {
 	}
 	if strings.Contains(got, "\x1b[38;2;255;95;110m") {
 		t.Errorf("the built-in red survived the override\n%q", got)
+	}
+}
+
+// The translator's added words are italic and quieter than the body text, in
+// both themes.
+func TestTranslatorWordsReadItalicAndQuieter(t *testing.T) {
+	for _, theme := range []string{"dark", "light"} {
+		m := translatorReader(t, theme, config.Colors{}, "the <i>added</i> word")
+		if !strings.Contains(m.View().Content, m.styles.italics.Render("added")) {
+			t.Errorf("the %s theme does not render translator words in its italics style\n%q", theme, m.View().Content)
+		}
+		if !m.styles.italics.GetItalic() {
+			t.Errorf("the %s theme's translator words are not italic", theme)
+		}
+		if m.styles.italics.Render("x") == m.styles.jesus.Render("x") {
+			t.Errorf("the %s theme paints translator words like the words of Jesus", theme)
+		}
+	}
+
+	override := translatorReader(t, "dark", config.Colors{Italics: "9"}, "the <i>added</i> word")
+	if !strings.Contains(override.styles.italics.Render("x"), ";91m") {
+		t.Errorf("the italics color override was ignored: %q", override.styles.italics.Render("x"))
+	}
+}
+
+// A word the translator added inside the words of Jesus keeps the quieter
+// italics color: it is not the speaker's own word.
+func TestTranslatorWordsInsideTheWordsOfJesusStayQuiet(t *testing.T) {
+	m := translatorReader(t, "dark", config.Colors{}, "<J>a <i>added</i> word</J>")
+	got := m.View().Content
+	if !strings.Contains(got, m.styles.italics.Render("added")) {
+		t.Errorf("the added word did not take the italics style\n%q", got)
+	}
+	if strings.Contains(got, m.styles.jesus.Render("added")) {
+		t.Errorf("the added word was painted red like the words of Jesus\n%q", got)
+	}
+	if !strings.Contains(got, m.styles.jesus.Render("a ")) {
+		t.Errorf("the words of Jesus around the added word lost their red\n%q", got)
 	}
 }
 

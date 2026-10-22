@@ -31,6 +31,7 @@ var (
 			Label:     "#D7D7D7",
 			Reference: "#D7D7D7",
 			Warning:   "#FF9146",
+			Italics:   "#8C8C8C",
 			Jesus:     "#FF5F6E",
 			VerseNum:  "#898989",
 			CursorNum: "#96DC5A",
@@ -49,6 +50,7 @@ var (
 			Label:     "240",
 			Reference: "236",
 			Warning:   "130",
+			Italics:   "243",
 			Jesus:     "160",
 			VerseNum:  "245",
 			CursorNum: "25",
@@ -122,6 +124,7 @@ func paletteFor(theme string, overrides config.Colors) Palette {
 	set(&p.Label, overrides.Label)
 	set(&p.Reference, overrides.Reference)
 	set(&p.Warning, overrides.Warning)
+	set(&p.Italics, overrides.Italics)
 	set(&p.Jesus, overrides.Jesus)
 	set(&p.VerseNum, overrides.VerseNum)
 	set(&p.CursorNum, overrides.CursorNum)
@@ -142,7 +145,7 @@ type styles struct {
 	warning        lipgloss.Style
 	invalid        lipgloss.Style
 	frame          lipgloss.Style
-	italics        lipgloss.Style
+	italics        lipgloss.Style // the translator's added words: italic in a quieter color, so they read as supplied
 	jesus          lipgloss.Style
 	verseNum       lipgloss.Style
 	cursorNum      lipgloss.Style
@@ -167,7 +170,7 @@ func newStyles(p Palette, bookColors bookPalette) styles {
 		warning:    lipgloss.NewStyle().Foreground(lipgloss.Color(p.Warning)),
 		invalid:    lipgloss.NewStyle().Foreground(lipgloss.Color(p.Jesus)).Background(lipgloss.Color(p.Field)), // the theme's red on the input's band, for a number the translation has no Verse or Chapter for
 		frame:      lipgloss.NewStyle().Foreground(lipgloss.Color(p.Key)),
-		italics:    lipgloss.NewStyle().Italic(true),
+		italics:    lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color(p.Italics)),
 		jesus:      lipgloss.NewStyle().Foreground(lipgloss.Color(p.Jesus)),
 		verseNum:   lipgloss.NewStyle().Foreground(lipgloss.Color(p.VerseNum)),
 		cursorNum:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.CursorNum)),

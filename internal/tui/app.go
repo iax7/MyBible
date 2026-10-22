@@ -513,15 +513,16 @@ func (m Model) renderRuns(runs []module.Run) string {
 	return b.String()
 }
 
-// runStyle is the display style for one Run of Verse text.
+// runStyle is the display style for one Run of Verse text. Italics wins over
+// the words-of-Jesus red: a Module marks the translator's added words with <i>,
+// and such a word is not the speaker's own, so it reads in the quieter italics
+// color even inside a <J> span.
 func (m Model) runStyle(run module.Run) lipgloss.Style {
 	switch {
-	case run.Red && run.Italics:
-		return m.styles.jesus.Italic(true)
-	case run.Red:
-		return m.styles.jesus
 	case run.Italics:
 		return m.styles.italics
+	case run.Red:
+		return m.styles.jesus
 	}
 	return lipgloss.NewStyle()
 }
