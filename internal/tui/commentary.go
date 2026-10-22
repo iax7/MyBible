@@ -277,7 +277,7 @@ func (m Model) commentaryRange(row module.CommentaryRow) string {
 }
 
 // updateCommentary handles keystrokes while the Commentary modal is open: Tab
-// and h/l switch modules, j/k and the page keys scroll, Esc closes.
+// and h/l switch modules, ↑/↓ or j/k and the page keys scroll, Esc closes.
 func (m Model) updateCommentary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	modal := &m.commentaryModal
 	if !modal.open || len(modal.tabs) == 0 {
@@ -330,7 +330,7 @@ func (m Model) commentaryView() string {
 		body += "\n\n"
 	}
 	body += strings.Join(visible, "\n")
-	body += "\n" + m.styles.hint.Render(m.translate("tab to switch · j/k to scroll"))
+	body += "\n" + m.styles.hint.Render(m.translate("tab to switch · ↑/↓, j/k to scroll"))
 	return m.styles.frameBox(m.translate(commentaryTitle)+" · "+modal.reference.String(), keyClose, body)
 }
 

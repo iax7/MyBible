@@ -50,8 +50,7 @@ var barCommands = []Command{
 // MovementCommands are the keys that move the Verse cursor or the Chapter view,
 // listed in the Help modal apart from the commands.
 var MovementCommands = []Command{
-	{keyVerseDown, "Verse down"},
-	{keyVerseUp, "Verse up"},
+	{keyVerseKeys, "Verse up/down"},
 	{keyPageDown, "Page down"},
 	{keyPageUp, "Page up"},
 	{keyPrevChapter, "Previous Chapter"},
@@ -87,6 +86,7 @@ const (
 const (
 	keyVerseDown   = "j"
 	keyVerseUp     = "k"
+	keyVerseKeys   = "↑/↓, j/k" // how Help names the Verse cursor keys
 	keyPageDown    = "ctrl+d"
 	keyPageUp      = "ctrl+u"
 	keyPrevChapter = "["
@@ -319,9 +319,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.back()
 		case keyForward:
 			m = m.forward()
-		case keyVerseDown:
+		case keyVerseDown, keyDown:
 			m = m.moveCursor(1)
-		case keyVerseUp:
+		case keyVerseUp, keyUp:
 			m = m.moveCursor(-1)
 		case keyPageDown:
 			m = m.moveCursor(m.pageSize())

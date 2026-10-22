@@ -65,6 +65,31 @@ func TestVerseCursorMovesWithJAndK(t *testing.T) {
 	}
 }
 
+func TestArrowKeysMoveTheVerseCursorToo(t *testing.T) {
+	m := navReader(t)
+
+	m, _ = send(t, m, press(tea.KeyDown, "", 0))
+	if got := on(m); got != "Genesis 1:2" {
+		t.Errorf("down did not move the Verse cursor, the reader is on %q", got)
+	}
+	m, _ = send(t, m, press(tea.KeyDown, "", 0))
+	if got := on(m); got != "Genesis 1:3" {
+		t.Errorf("down did not move the Verse cursor again, the reader is on %q", got)
+	}
+
+	m, _ = send(t, m, press(tea.KeyUp, "", 0))
+	if got := on(m); got != "Genesis 1:2" {
+		t.Errorf("up did not move the Verse cursor back, the reader is on %q", got)
+	}
+
+	// At the Chapter's first Verse the arrow stops, exactly as k does.
+	m, _ = send(t, m, press('g', "g", 0))
+	m, _ = send(t, m, press(tea.KeyUp, "", 0))
+	if got := on(m); got != "Genesis 1:1" {
+		t.Errorf("up crossed the Chapter's start, the reader is on %q", got)
+	}
+}
+
 func TestTheCursorKeepsTheCurrentVerseVisible(t *testing.T) {
 	m := resized(t, navReader(t), 100, 8)
 	m, _ = send(t, m, press('G', "G", 0))

@@ -48,6 +48,11 @@ go build ./cmd/mybible
 | `q` | Quit |
 | `Ctrl-B` | Toggle the top bar |
 | `Esc` | Close a modal |
+| `j` / `↓` | Verse down |
+| `k` / `↑` | Verse up |
+| `Ctrl-D` / `Ctrl-U` | Page down / up |
+| `[` / `]` | Previous / next Chapter |
+| `g` / `G` | Top / bottom of Chapter |
 
 ## Modules
 

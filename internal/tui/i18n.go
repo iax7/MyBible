@@ -37,8 +37,7 @@ var spanish = map[string]string{
 	"Close":           "Cerrar",
 
 	// Movement keys, shown in the Help modal.
-	"Verse down":        "Versículo abajo",
-	"Verse up":          "Versículo arriba",
+	"Verse up/down":     "Versículo arriba/abajo",
 	"Page down":         "Página abajo",
 	"Page up":           "Página arriba",
 	"Previous Chapter":  "Capítulo anterior",
@@ -60,7 +59,6 @@ var spanish = map[string]string{
 	"No commentaries":                      "Sin comentarios",
 	"Chapter overview":                     "Resumen del capítulo",
 	"end":                                  "final",
-	"tab to switch · j/k to scroll":        "tab para cambiar · j/k para desplazar",
 	"Today":                                "Hoy",
 	"Yesterday":                            "Ayer",
 	"No matches":                           "Sin resultados",
@@ -70,6 +68,9 @@ var spanish = map[string]string{
 	"enter to go · tab to complete":        "enter para ir · tab para completar",
 	"That is not a Reference. Try John 3:16.":      "Eso no es una referencia. Prueba con John 3:16.",
 	"No such Reference in the Active translation.": "Esa referencia no existe en la traducción activa.",
+
+	// The Commentary modal's key hint names the arrows as well as j/k.
+	"tab to switch · ↑/↓, j/k to scroll": "tab para cambiar · ↑/↓, j/k para desplazar",
 
 	// Reading pane.
 	"Chapter %d": "Capítulo %d",
