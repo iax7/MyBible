@@ -13,9 +13,18 @@ type Reference struct {
 	Verse   int
 }
 
-// String renders a Reference the way the reader shows it and accepts it back.
+// String renders a Reference the way the reader stores it: with the Canonical
+// text of the Book's name, which is the only form ParseReference knows and which
+// keeps state files independent of the Active translation.
 func (r Reference) String() string {
 	return fmt.Sprintf("%s %d:%d", r.Book.Name, r.Chapter, r.Verse)
+}
+
+// DisplayString renders a Reference the way the reader shows it: with the name
+// the Active translation gives the Book. Unlike String, it is not the form
+// persisted state is read back from, so it belongs only in lists and titles.
+func (r Reference) DisplayString() string {
+	return fmt.Sprintf("%s %d:%d", r.Book.DisplayName(), r.Chapter, r.Verse)
 }
 
 // ParseReference parses "John 3:16", "John 3", or "John". The Book name is

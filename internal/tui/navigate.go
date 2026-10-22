@@ -26,6 +26,26 @@ func (m Model) books() []module.Book {
 	return m.text.Books()
 }
 
+// displayBook is the Book as the Active translation names it. A Book reached
+// through the loaded Translation already carries the Module's names; one kept
+// in History or the Trail carries only its number, so it is resolved here.
+func (m Model) displayBook(book module.Book) module.Book {
+	if m.text == nil {
+		return book
+	}
+	if loaded, ok := m.text.Book(book.Number); ok {
+		return loaded
+	}
+	return book
+}
+
+// displayReference renders a Reference with the name the Active translation
+// gives its Book, for every list and title the reader shows.
+func (m Model) displayReference(reference module.Reference) string {
+	reference.Book = m.displayBook(reference.Book)
+	return reference.DisplayString()
+}
+
 // chapterVerses is the current Chapter's Verses in Verse order.
 func (m Model) chapterVerses() []module.Verse {
 	if m.text == nil {

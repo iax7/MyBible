@@ -331,7 +331,7 @@ func (m Model) commentaryView() string {
 	}
 	body += strings.Join(visible, "\n")
 	body += "\n" + m.styles.hint.Render(m.translate("tab to switch · ↑/↓, j/k to scroll"))
-	return m.styles.frameBox(m.translate(commentaryTitle)+" · "+modal.reference.String(), keyClose, body)
+	return m.styles.frameBox(m.translate(commentaryTitle)+" · "+m.displayReference(modal.reference), keyClose, body)
 }
 
 // commentaryTabStrip is the row of module names that heads the modal, the

@@ -114,7 +114,7 @@ func TestSubheadingReferenceLabels(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			runs := headingRuns(tc.raw)
+			runs := headingRuns(tc.raw, nil)
 			if got := headingText(runs); got != tc.text {
 				t.Errorf("headingRuns(%q) text = %q, want %q", tc.raw, got, tc.text)
 			}
@@ -131,5 +131,25 @@ func TestSubheadingReferenceLabels(t *testing.T) {
 				t.Errorf("headingRuns(%q) = %+v, want %+v", tc.raw, runs, tc.runs)
 			}
 		})
+	}
+}
+
+func TestHeadingRunsNamesTheBookTheWayTheTranslationDoes(t *testing.T) {
+	bookName := func(number int) string {
+		if number == 20 {
+			return "Éxodo"
+		}
+		return ""
+	}
+	runs := headingRuns("La salida <x>b:20 3:1</x>", bookName)
+
+	var links []string
+	for _, run := range runs {
+		if run.Link {
+			links = append(links, run.Text)
+		}
+	}
+	if want := []string{"Éxodo 3:1"}; !reflect.DeepEqual(links, want) {
+		t.Errorf("headingRuns() links = %q, want %q", links, want)
 	}
 }

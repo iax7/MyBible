@@ -49,3 +49,20 @@ func TestReferenceStringRoundTrips(t *testing.T) {
 		t.Errorf("ParseReference(String()) = %+v, %v; want %+v", back, ok, ref)
 	}
 }
+
+// A Reference keeps the Canonical name for state files and shows the one the
+// Module itself gives the Book, so a Spanish Translation reads "Génesis" without
+// changing what ParseReference accepts.
+func TestReferenceDisplayStringUsesTheModulesName(t *testing.T) {
+	book := Book{Number: 10, Name: "Genesis", ShortName: "Gn", LongName: "Génesis"}
+	ref := Reference{Book: book, Chapter: 1, Verse: 1}
+	if got := ref.String(); got != "Genesis 1:1" {
+		t.Errorf("Reference.String() = %q, want the stored form %q", got, "Genesis 1:1")
+	}
+	if got := ref.DisplayString(); got != "Génesis 1:1" {
+		t.Errorf("Reference.DisplayString() = %q, want the shown form %q", got, "Génesis 1:1")
+	}
+	if back, ok := ParseReference(ref.DisplayString()); ok {
+		t.Errorf("ParseReference(DisplayString()) = %+v, true; a displayed name is not a stored form", back)
+	}
+}

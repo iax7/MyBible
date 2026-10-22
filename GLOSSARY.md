@@ -20,8 +20,16 @@ _Avoid_: Version, edition, Bible
 The fixed, built-in ordered list of Bible books (the 66, plus optional deuterocanonicals) whose ids match MyBible's book numbers. Modules map into it by book number.
 _Avoid_: Book table, book index, catalogue
 
+**Canonical name**:
+A Book's built-in name in the Canonical book list. It identifies the Book across Translations, names it when a Module carries no name, and is the form persisted state is written in.
+_Avoid_: Internal name, default name
+
 **Book**:
-One entry in the Canonical book list.
+One entry in the Canonical book list. Its number identifies it across Translations; the name it is shown by comes from the Active translation.
+
+**Book name**:
+What the reader shows for a Book: the Module's own long name, abbreviated by its own short name. The Canonical name is the fallback when a Module carries no name.
+_Avoid_: Display name, label, title
 
 **Book classification**:
 The kind of writing a Book belongs to — the Pentateuch, the Historical books, the Poetic books, the Major prophets, the Minor prophets, the Gospels, Acts, the Epistles by Paul, the General Epistles, Revelation, or Non-canonical. MyBible colors its own book selector by it, and the reader colors a Book's name by it wherever the name is shown.

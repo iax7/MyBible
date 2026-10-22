@@ -10,8 +10,9 @@ import (
 // <x>target</x> tag carries its target as content rather than anchor text, so it
 // becomes a Link Run holding a readable label. A malformed target is hidden like
 // any other <x>. The text around a target goes through displayText, so the other
-// markup a Subheading can carry stays hidden the way it always was.
-func headingRuns(text string) []Run {
+// markup a Subheading can carry stays hidden the way it always was. bookName
+// names a Book the way the Translation does; nil keeps the Canonical names.
+func headingRuns(text string, bookName func(int) string) []Run {
 	var runs []Run
 	for {
 		start, after := nextTag(text, "x")
@@ -25,7 +26,7 @@ func headingRuns(text string) []Run {
 		if closeStart < 0 {
 			break // an unclosed <x> hides the rest, as ParseMarkup does
 		}
-		if label, ok := headingLabel(text[after : after+closeStart]); ok {
+		if label, ok := headingLabel(text[after:after+closeStart], bookName); ok {
 			runs = append(runs, Run{Text: label, Link: true})
 		}
 		text = text[after+closeEnd:]
@@ -79,8 +80,9 @@ func headingText(runs []Run) string {
 // headingLabel turns an <x> target into the label the reader shows. The target
 // is MyBible's dictionary hyperlink format: a Canonical book number, then a
 // location, with an optional leading "B:". Nothing but a readable label comes
-// out of it; the target is not used for navigation.
-func headingLabel(target string) (string, bool) {
+// out of it; the target is not used for navigation. The Book is named by
+// bookName when it gives one, and by its Canonical name otherwise.
+func headingLabel(target string, bookName func(int) string) (string, bool) {
 	target = strings.TrimSpace(target)
 	if len(target) >= 2 && (target[0] == 'b' || target[0] == 'B') && target[1] == ':' {
 		target = strings.TrimSpace(target[2:])
@@ -110,7 +112,13 @@ func headingLabel(target string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return book.Name + " " + label, true
+	name := book.Name
+	if bookName != nil {
+		if shown := bookName(book.Number); shown != "" {
+			name = shown
+		}
+	}
+	return name + " " + label, true
 }
 
 // headingLocationLabel renders the location part of a target: a Chapter, a

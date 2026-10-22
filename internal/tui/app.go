@@ -381,7 +381,7 @@ func (m Model) View() tea.View {
 		x, y := centred(box, m.width, m.height)
 		content = overlay(content, box, m.width, m.height, x, y)
 		if popup := m.pickerPopupView(); popup != "" {
-			content = overlay(content, popup, m.width, m.height, x+pickerPopupInset, y+lipgloss.Height(box))
+			content = overlay(content, popup, m.width, m.height, x, y+m.pickerPopupTop())
 		}
 	}
 	v := tea.NewView(content)
@@ -588,7 +588,7 @@ func (m Model) referenceLabel() string {
 	if m.book.Number == 0 {
 		return m.styles.reference.Render(emptyReference)
 	}
-	return m.styles.bookTab(m.book.Number).Render(fmt.Sprintf(" %s %d ", m.book.Name, m.chapter))
+	return m.styles.bookTab(m.book.Number).Render(fmt.Sprintf(" %s %d ", m.book.DisplayName(), m.chapter))
 }
 
 // wrapParts lays out command entries on as few lines as fit width, never

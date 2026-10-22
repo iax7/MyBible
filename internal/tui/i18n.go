@@ -64,9 +64,9 @@ var spanish = map[string]string{
 	"No matches":                           "Sin resultados",
 	"No warnings":                          "Sin avisos",
 	"enter to select":                      "enter para seleccionar",
-	"For example: John, John 3, John 3:16": "Por ejemplo: John, John 3, John 3:16",
+	"For example: %s, %s 1, %s 1:1":        "Por ejemplo: %s, %s 1, %s 1:1",
 	"enter to go · tab to complete":        "enter para ir · tab para completar",
-	"That is not a Reference. Try John 3:16.":      "Eso no es una referencia. Prueba con John 3:16.",
+	"That is not a Reference. Try %s 1:1.": "Eso no es una referencia. Prueba con %s 1:1.",
 	"No such Reference in the Active translation.": "Esa referencia no existe en la traducción activa.",
 
 	// The Commentary modal's key hint names the arrows as well as j/k.

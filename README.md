@@ -62,6 +62,11 @@ from somewhere else, set `module_directory` in the config file. Module files are
 opened read-only and are never modified or copied. Module content is mixed-license
 and mostly not redistributable, so no module file belongs in this repository.
 
+Book names come from the Module, not from the reader: a Spanish Translation lists
+`Gn · Génesis` and completes `Génesis`. The built-in English name still works as
+input — `Genesis 3:16` reaches the same Verse — and a Book's number is what
+identifies it, so changing translations keeps your place.
+
 Subheadings are read too. A Translation carries its own in the module's
 `stories` table — the section titles of the printed edition, as `NBLA'05` does
 — or a `subheadings` module named after its Bible supplies them

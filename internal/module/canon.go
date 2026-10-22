@@ -8,26 +8,40 @@ import (
 // Book is one entry in the Canonical book list.
 type Book struct {
 	Number   int    // MyBible's book_number, stable across the reader
-	Name     string // the reader's own name, so naming is the same in every Translation
+	Name     string // the Canonical name: the Book's identity and the fallback for what the interface shows
 	Chapters int    // Chapters present in a loaded Translation; 0 in the Canonical list
 
 	// ShortName and LongName are the names the Module itself uses for the Book,
-	// filled only in a loaded Translation. The reader never shows them: they
-	// widen what an input accepts, so a Module's own naming — and its language —
-	// can name a Book without changing what the interface calls it.
+	// filled only in a loaded Translation. DisplayName shows LongName and the
+	// Book lists show ShortName, so a Translation is named in its own language;
+	// both also widen what an input accepts.
 	ShortName string
 	LongName  string
 }
 
-// Names is every name the Book answers to: the reader's own, then the Module's
-// own when the Translation is loaded. Matching an input goes through all of
-// them; the interface shows only the first.
+// DisplayName is the name the reader shows for the Book: the Module's own long
+// name when the Translation is loaded, the Canonical name otherwise. Book rows,
+// References, and the top bar are named by it, so NBLA reads "Génesis" while the
+// Book's number, not its name, is what identifies it.
+func (b Book) DisplayName() string {
+	if name := strings.TrimSpace(b.LongName); name != "" {
+		return name
+	}
+	return b.Name
+}
+
+// Names is every name the Book answers to: the Canonical name, the Module's
+// abbreviation, and the name the interface shows. Matching an input goes through
+// all of them; only DisplayName is shown.
 func (b Book) Names() []string {
-	names := []string{b.Name}
-	for _, name := range []string{b.ShortName, b.LongName} {
-		if name != "" && name != b.Name {
-			names = append(names, name)
+	names := make([]string, 0, 3)
+	seen := make(map[string]bool, 3)
+	for _, name := range []string{b.Name, b.ShortName, b.DisplayName()} {
+		if name == "" || seen[name] {
+			continue
 		}
+		seen[name] = true
+		names = append(names, name)
 	}
 	return names
 }
@@ -37,7 +51,7 @@ func (b Book) Names() []string {
 func (b Book) Named(text string) bool {
 	text = Normalize(strings.TrimSpace(text))
 	for _, name := range b.Names() {
-		if Normalize(name) == text {
+		if Normalize(strings.TrimSpace(name)) == text {
 			return true
 		}
 	}

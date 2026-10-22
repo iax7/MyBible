@@ -34,7 +34,7 @@ type choice struct {
 	query     string
 	cursor    int
 	err       string
-	completed bool // the Reference modal's Tab already wrote a Book: the menu stays out of the way
+	completed bool // the completion shortcut already wrote a Book: the menu stays out of the way
 	width     int  // the widest the Reference modal has had to be, so it grows but never shrinks
 }
 
@@ -87,7 +87,7 @@ func bookItems(m Model) []pickerItem {
 			label:  bookLabel(b, width),
 			search: strings.Join(b.Names(), " "),
 			value:  b.Number,
-			head:   b.Name,
+			head:   b.DisplayName(),
 			short:  b.ShortName,
 			style:  m.styles.book(b.Number),
 		})
@@ -101,13 +101,14 @@ const bookSeparator = " · "
 
 // bookLabel is the row a Book shows in a list: the Module's own abbreviation
 // padded so every name starts at the same column, the separator, and the
-// canonical name — "Gn   · Genesis". A Module that names the Book only in full
-// shows the name alone.
+// Module's own name — "Gn   · Génesis". A Module that names the Book only in
+// full shows the name alone.
 func bookLabel(b module.Book, width int) string {
+	name := b.DisplayName()
 	if b.ShortName == "" {
-		return b.Name
+		return name
 	}
-	return pad(b.ShortName, width) + bookSeparator + b.Name
+	return pad(b.ShortName, width) + bookSeparator + name
 }
 
 // bookParts splits a Book's row into its abbreviation and its name, the
@@ -215,9 +216,9 @@ var pickers = [...]pickerSpec{
 			items := make([]pickerItem, 0, len(m.results))
 			for i, result := range m.results {
 				items = append(items, pickerItem{
-					label: result.Reference.String() + "  " + result.Snippet,
+					label: m.displayReference(result.Reference) + "  " + result.Snippet,
 					value: i,
-					head:  result.Reference.Book.Name,
+					head:  result.Reference.Book.DisplayName(),
 					style: m.styles.book(result.Reference.Book.Number),
 				})
 			}
@@ -247,10 +248,10 @@ var pickers = [...]pickerSpec{
 			for i := len(m.history) - 1; i >= 0; i-- { // most recent first
 				reference := m.history[i].Reference
 				items = append(items, pickerItem{
-					label:  reference.String(),
-					search: reference.String(),
+					label:  m.displayReference(reference),
+					search: reference.String() + " " + m.displayReference(reference),
 					value:  i,
-					head:   reference.Book.Name,
+					head:   m.displayBook(reference.Book).DisplayName(),
 					style:  m.styles.book(reference.Book.Number),
 					group:  m.historyDay(m.history[i].At),
 				})
@@ -293,8 +294,8 @@ func (m Model) openPicker(kind pickerKind) Model {
 }
 
 // updatePicker handles keystrokes while a modal is open: typing filters the
-// list, Enter confirms, Tab completes the Reference modal, Esc closes. Every
-// modal takes the same keys.
+// list, Enter confirms, Tab — or a space when only one Book matches — completes
+// the Reference modal, Esc closes. Every modal takes the same keys.
 func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	types := m.pickerTypes()
 	switch msg.String() {
@@ -319,6 +320,10 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.picker.cursor++
 	default:
 		if types && msg.Text != "" {
+			if msg.Text == " " && m.pickerSpaceCompletes() {
+				m = m.pickerComplete()
+				break
+			}
 			before := m.pickerFilterQuery()
 			m.picker.query += msg.Text
 			m.picker.err = ""
@@ -412,13 +417,27 @@ func (m Model) pickerComplete() Model {
 		return m
 	}
 	_, location := module.SplitReference(m.picker.query)
-	m.picker.query = items[m.picker.cursor].head + " " // the Book's canonical Name
+	m.picker.query = items[m.picker.cursor].head + " " // the Book's displayed name
 	if location != "" {
 		m.picker.query += location
 	}
 	m.picker.err = ""
 	m.picker.completed = true // the menu did its job; it comes back only on a fresh name
 	return m
+}
+
+// pickerSpaceCompletes reports whether a space should complete the Reference
+// modal's input instead of being typed into it. The space is the completion
+// menu's shortcut, so it only acts while the menu is open and has exactly one
+// Book to offer: with several matches it is ordinary text, which is what lets a
+// reader write the space inside a multi-word Book name ("2 S") and the space
+// before a Chapter ("John 3"). Once the Book is completed the menu is gone and
+// every space is typed as it always was.
+func (m Model) pickerSpaceCompletes() bool {
+	return m.picker.kind == pickerReference &&
+		!m.picker.completed &&
+		m.pickerFilterQuery() != "" &&
+		len(m.pickerMatches()) == 1
 }
 
 // confirmSearch jumps to the Search result at index i, closing the modal.
@@ -445,7 +464,7 @@ func (m Model) jumpToReference(reference module.Reference) Model {
 func (m Model) confirmReference() Model {
 	reference, ok := m.parseReferenceInput()
 	if !ok {
-		m.picker.err = m.translate("That is not a Reference. Try John 3:16.")
+		m.picker.err = fmt.Sprintf(m.translate("That is not a Reference. Try %s 1:1."), m.exampleBook())
 		return m
 	}
 	next, ok := m.jumpAndRecord(reference)
@@ -689,12 +708,12 @@ func (m Model) pickerLabel(item pickerItem, line string, cursor bool) string {
 
 // The Reference modal's measurements: the input band is wide enough to type into
 // even when the range line is short; the completion menu stays a menu rather than
-// a list, and is indented so its chevron lines up with the input field's.
+// a list, and is as wide as the input band so it covers the box's lower edge
+// cleanly when it hangs under the field.
 const (
-	fieldMinWidth    = 30
-	popupRows        = 8
-	popupWidth       = 40
-	pickerPopupInset = 2
+	fieldMinWidth = 30
+	popupRows     = 8
+	popupWidth    = 40
 )
 
 // referencePickerView is the Go to Reference modal: the input line the reader
@@ -761,9 +780,18 @@ func (m Model) referenceInput(state referenceState) string {
 		m.styles.field.Render(query[state.badEnd:])
 }
 
+// pickerPopupTop is the line of the modal's box the completion menu begins on:
+// the line right under the input field, so the Books the input names hang from
+// the field itself rather than from the bottom of the box. It counts the frame's
+// top edge, the status lines above the field, and the field's own line.
+func (m Model) pickerPopupTop() int {
+	status, _ := m.referenceStatus()
+	return 1 + len(status) + 1
+}
+
 // pickerPopupView is the Reference modal's completion menu: the Books its input
-// names, floating under the input. It is empty for every other modal, once Tab
-// has completed a Book, before anything is typed, and when nothing matches.
+// names, floating under the input. It is empty for every other modal, once the
+// input has completed a Book, before anything is typed, and when nothing matches.
 func (m Model) pickerPopupView() string {
 	if m.picker.kind != pickerReference || m.picker.completed || m.pickerFilterQuery() == "" {
 		return ""
@@ -787,6 +815,13 @@ func (m Model) pickerPopupView() string {
 	}
 	if width > popupWidth {
 		width = popupWidth
+	}
+	// The menu is as wide as the input band's box, so it hides the footer and the
+	// box's bottom edge it covers instead of leaving their remains poking out
+	// beside it. The box spends a border and two cells of padding on each side of
+	// the band, which the menu's own row prefix and trailing pad stand in for.
+	if content := max(m.picker.width, m.referenceNeeds()) + 2; content > width {
+		width = content
 	}
 
 	var b strings.Builder
@@ -824,6 +859,27 @@ func (m Model) popupRow(item pickerItem, cursor bool, width int) string {
 	return row
 }
 
+// referenceExample is the line the Reference modal shows before its input names
+// a Book: the Book the reader is on written the three ways an input may name a
+// location. It is written in the Active translation's own words, so a Spanish
+// Module shows "Por ejemplo: Génesis, Génesis 1, Génesis 1:1".
+func (m Model) referenceExample() string {
+	name := m.exampleBook()
+	return fmt.Sprintf(m.translate("For example: %s, %s 1, %s 1:1"), name, name, name)
+}
+
+// exampleBook is the Book the Reference modal's hints name: the reader's own, the
+// translation's first, or John when no translation is loaded.
+func (m Model) exampleBook() string {
+	if m.book.Number != 0 {
+		return m.book.DisplayName()
+	}
+	if books := m.books(); len(books) > 0 {
+		return books[0].DisplayName()
+	}
+	return "John"
+}
+
 // referenceState is what the Reference modal knows about its input: the range the
 // input may use, and, when the input has written a number the Active translation
 // has no Chapter or Verse for, where that number sits in the input so the modal
@@ -838,7 +894,7 @@ type referenceState struct {
 // range line and the number it may flag.
 func (m Model) referenceState() referenceState {
 	shapes := referenceState{
-		rangeText: m.translate("For example: John, John 3, John 3:16"),
+		rangeText: m.referenceExample(),
 		badStart:  -1,
 	}
 	book, location := module.SplitReference(m.picker.query)
@@ -851,7 +907,7 @@ func (m Model) referenceState() referenceState {
 		return shapes
 	}
 
-	chapters := fmt.Sprintf("%s 1..%d", named.Name, named.Chapters)
+	chapters := fmt.Sprintf("%s 1..%d", named.DisplayName(), named.Chapters)
 	state := referenceState{rangeText: chapters, badStart: -1}
 	if !typed.written {
 		return state
@@ -872,7 +928,7 @@ func (m Model) referenceState() referenceState {
 	}
 
 	if typed.closed { // a Chapter still being typed may still grow into another
-		state.rangeText = fmt.Sprintf("%s %d:1..%d", named.Name, typed.chapter, last)
+		state.rangeText = fmt.Sprintf("%s %d:1..%d", named.DisplayName(), typed.chapter, last)
 	}
 	if typed.hasVerse && (typed.verse < 1 || typed.verse > last) {
 		return state.flag(runs, verseNumber)

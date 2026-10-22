@@ -305,8 +305,8 @@ func TestTheReferencePickerJumpsToAVerse(t *testing.T) {
 func TestTheReferencePickerListsTheBooksTheInputNames(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
-	if got := modalText(t, m); strings.Contains(got, "Genesis") || strings.Contains(got, "Exodus") {
-		t.Fatalf("v listed every Book before anything was typed\n%s", got)
+	if popup := m.pickerPopupView(); popup != "" {
+		t.Fatalf("v listed every Book before anything was typed\n%s", ansi.ReplaceAllString(popup, ""))
 	}
 
 	m = typeKey(t, m, "exo")
@@ -366,6 +366,93 @@ func TestTabClosesTheCompletionMenu(t *testing.T) {
 	}
 }
 
+// The Books the input names hang from the field it types into, not from the
+// bottom of the box: the line right under the input is the first Book.
+func TestTheCompletionMenuHangsFromTheInput(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "ex")
+
+	lines := strings.Split(render(t, m), "\n")
+	field := -1
+	for i, line := range lines {
+		if strings.Contains(line, "❯ ex") {
+			field = i
+		}
+	}
+	if field < 0 || field+1 >= len(lines) {
+		t.Fatalf("the Reader did not show the input field\n%s", render(t, m))
+	}
+	if next := lines[field+1]; !strings.Contains(next, "Exo · Exodus") {
+		t.Errorf("the completion menu does not hang from the input: the line under it is %q\n%s", next, render(t, m))
+	}
+}
+
+// The space is the completion menu's own shortcut: with exactly one Book on it,
+// it does what Tab does and leaves the menu closed.
+func TestSpaceCompletesTheOnlyBook(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "ex")
+	m, _ = send(t, m, press(tea.KeySpace, " ", 0))
+
+	if got := render(t, m); !strings.Contains(got, "❯ Exodus ") {
+		t.Fatalf("space did not write the only Book into the input\n%s", got)
+	}
+	if popup := m.pickerPopupView(); popup != "" {
+		t.Errorf("the completion menu stayed open after space completed the Book\n%s", ansi.ReplaceAllString(popup, ""))
+	}
+}
+
+// A space with several Books on the menu is ordinary text: it is what lets the
+// reader narrow "2" down to "2 Samuel" by writing a second word. Once the input
+// names a single Book, the next space completes it.
+func TestSpaceWaitsForASingleBook(t *testing.T) {
+	books := []modtest.Book{
+		{Number: 100, ShortName: "2Sa", LongName: "2 Samuel", Present: true},
+		{Number: 120, ShortName: "2Ki", LongName: "2 Kings", Present: true},
+	}
+	var verses []modtest.Verse
+	for _, book := range books {
+		for n := 1; n <= 2; n++ {
+			verses = append(verses, modtest.Verse{Book: book.Number, Chapter: 1, Verse: n, Text: "verse"})
+		}
+	}
+	m := activeReader(t, map[string]string{"description": "Numbered Books"}, books, verses)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "2")
+
+	if popup := ansi.ReplaceAllString(m.pickerPopupView(), ""); !strings.Contains(popup, "2 Samuel") || !strings.Contains(popup, "2 Kings") {
+		t.Fatalf("two Books did not leave two matches on the completion menu\n%s", popup)
+	}
+
+	m = typeKey(t, m, " ")
+	if got := render(t, m); !strings.Contains(got, "❯ 2 ") {
+		t.Fatalf("the space with two matches was not typed into the input\n%s", got)
+	}
+
+	m = typeKey(t, m, "s")
+	m, _ = send(t, m, press(tea.KeySpace, " ", 0))
+	if got := render(t, m); !strings.Contains(got, "❯ 2 Samuel ") {
+		t.Fatalf("the space did not complete the only Book\n%s", got)
+	}
+}
+
+// Once the Book is completed the menu is closed, so later spaces are the ones
+// the Reference accepts between a Chapter and a Verse.
+func TestSpaceSeparatesTheVerseAfterCompletion(t *testing.T) {
+	m := navReader(t)
+	m, _ = send(t, m, press('v', "v", 0))
+	m = typeKey(t, m, "gen")
+	m = typeKey(t, m, " ")
+	m = typeKey(t, m, "2 1")
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := on(m); got != "Genesis 2:1" {
+		t.Errorf("the space between Chapter and Verse was not kept, the reader is on %q", got)
+	}
+}
+
 // The example the modal accepts sits above the input, so the Book the input
 // names is not written three times in the same view.
 func TestTheReferenceExampleSitsAboveTheInput(t *testing.T) {
@@ -379,31 +466,30 @@ func TestTheReferenceExampleSitsAboveTheInput(t *testing.T) {
 }
 
 // The modal grows to fit a line it has to show and never shrinks back under the
-// reader's eyes: its size must not flicker as the reader types.
+// reader's eyes: its size must not flicker as the reader types. The example line
+// repeats the Book's name three times, so it is the widest line the modal needs.
 func TestTheReferenceModalOnlyGrows(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
 	width := lipgloss.Width(m.modalView())
 
-	// Tab replaces the long example line with the Book's short range.
+	// Tab replaces the example line with the Book's short range.
 	m = typeKey(t, m, "exo")
 	m, _ = send(t, m, press(tea.KeyTab, "", 0))
 	if got := lipgloss.Width(m.modalView()); got != width {
 		t.Errorf("the modal changed size to %d after Tab, from %d", got, width)
 	}
 
-	// A rejection adds a message longer than the modal.
+	// A rejection adds a message and must not make the modal jump; a longer
+	// message may widen it once, and it keeps that size afterwards.
 	m = typeKey(t, m, "999")
 	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
-	grown := lipgloss.Width(m.modalView())
-	if grown <= width {
-		t.Errorf("the modal did not grow for the rejection message: %d, from %d", grown, width)
-	}
+	width = max(width, lipgloss.Width(m.modalView()))
 
 	// And it keeps that size: deleting the rejected input must not shrink it.
 	m, _ = send(t, m, press(tea.KeyBackspace, "", 0))
-	if got := lipgloss.Width(m.modalView()); got != grown {
-		t.Errorf("the modal changed size to %d after the message, from %d", got, grown)
+	if got := lipgloss.Width(m.modalView()); got != width {
+		t.Errorf("the modal changed size to %d after the message, from %d", got, width)
 	}
 }
 
@@ -485,7 +571,8 @@ func TestTheReferencePickerTakesTheFirstBookWhenTheInputNamesNone(t *testing.T) 
 }
 
 // Enter never guesses from the list: a name no Book has to answer to, even a
-// prefix the list would have shown, is rejected. Tab is the way to complete it.
+// prefix the list would have shown, is rejected. Completion is the way to use
+// the list's highlight.
 func TestTheReferencePickerDoesNotGuessAPrefix(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
@@ -536,7 +623,7 @@ func TestTheReferencePickerTakesEveryChapterVerseSeparator(t *testing.T) {
 func TestTheReferenceViewShowsTheChaptersTheNamedBookAccepts(t *testing.T) {
 	m := navReader(t)
 	m, _ = send(t, m, press('v', "v", 0))
-	if got := render(t, m); !strings.Contains(got, "For example: John, John 3, John 3:16") {
+	if got := render(t, m); !strings.Contains(got, "For example: Genesis, Genesis 1, Genesis 1:1") {
 		t.Fatalf("the modal does not say what to type before a Book is named\n%s", got)
 	}
 
@@ -599,10 +686,10 @@ func pickedOut(m Model, run string) string {
 // is typed, without waiting for Enter, and the input otherwise reads as typed.
 func TestTheReferenceViewPicksOutANumberTheBookLacks(t *testing.T) {
 	cases := []struct{ typed, bad string }{
-		{"gen 50", "50"}, // the fixture's Genesis has 3 Chapters
-		{"gen 0", "0"},
-		{"gen 3:999", "999"}, // Chapter 3 has 2 Verses
-		{"gen 3:0", "0"},
+		{"Genesis 50", "50"}, // the fixture's Genesis has 3 Chapters
+		{"Genesis 0", "0"},
+		{"Genesis 3:999", "999"}, // Chapter 3 has 2 Verses
+		{"Genesis 3:0", "0"},
 	}
 	for _, c := range cases {
 		m := navReader(t)

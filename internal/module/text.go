@@ -120,16 +120,24 @@ func (t Translation) Load() (*Text, []string, error) {
 	}
 
 	var warnings []string
+	// A Subheading's cross-reference is labeled with the name the Translation
+	// gives the Book it points at, so a Spanish Module reads "Éxodo 1:1".
+	bookName := func(number int) string {
+		if book, ok := books[number]; ok {
+			return book.DisplayName()
+		}
+		return ""
+	}
 	// The Translation's own Subheadings are the fallback. A companion Module
 	// that can be read replaces them outright; one that cannot leaves them in
 	// place and says so, because it adds headings, it is not what the reader
 	// came to read.
-	text.headings, err = loadStories(db, tables)
+	text.headings, err = loadStories(db, tables, bookName)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("%s: cannot read the stories table: %v", filepath.Base(t.path), err))
 	}
 	if t.subheadings != "" {
-		companion, err := loadSubheadings(t.subheadings)
+		companion, err := loadSubheadings(t.subheadings, bookName)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: cannot read the subheadings module: %v", filepath.Base(t.subheadings), err))
 		} else {
@@ -189,17 +197,17 @@ func (t *Text) Subheadings(number, chapter int) []Subheading {
 
 // loadStories reads a Translation's own Subheadings from its stories table. The
 // table is optional: a Translation without one has no headings and no error.
-func loadStories(db *sql.DB, tables map[string]bool) (map[int]map[int][]Subheading, error) {
+func loadStories(db *sql.DB, tables map[string]bool, bookName func(int) string) (map[int]map[int][]Subheading, error) {
 	if !tables[tableStories] {
 		return nil, nil
 	}
-	return loadHeadings(db, "SELECT book_number, chapter, verse, title FROM stories ORDER BY book_number, chapter, verse, order_if_several")
+	return loadHeadings(db, "SELECT book_number, chapter, verse, title FROM stories ORDER BY book_number, chapter, verse, order_if_several", bookName)
 }
 
 // loadSubheadings reads a companion Subheadings Module into memory, keyed by
 // Canonical Book and Chapter. The Module carries no book table, so its own book
 // numbers are mapped into the Canonical list on the way in, the way a Bible's are.
-func loadSubheadings(path string) (map[int]map[int][]Subheading, error) {
+func loadSubheadings(path string, bookName func(int) string) (map[int]map[int][]Subheading, error) {
 	db, err := openReadOnly(path)
 	if err != nil {
 		return nil, err
@@ -213,7 +221,7 @@ func loadSubheadings(path string) (map[int]map[int][]Subheading, error) {
 	if !tables[tableSubheadings] {
 		return nil, fmt.Errorf("missing the required %s table", tableSubheadings)
 	}
-	return loadHeadings(db, "SELECT book_number, chapter, verse, subheading FROM subheadings ORDER BY book_number, chapter, verse, order_if_several")
+	return loadHeadings(db, "SELECT book_number, chapter, verse, subheading FROM subheadings ORDER BY book_number, chapter, verse, order_if_several", bookName)
 }
 
 // loadHeadings reads Subheading rows from query, which must select book_number,
@@ -222,7 +230,7 @@ func loadSubheadings(path string) (map[int]map[int][]Subheading, error) {
 // rendered through headingRuns, so an <x> target becomes a Verse link label and
 // other markup is hidden. A heading that is nothing but punctuation or a
 // malformed cross-reference is skipped.
-func loadHeadings(db *sql.DB, query string) (map[int]map[int][]Subheading, error) {
+func loadHeadings(db *sql.DB, query string, bookName func(int) string) (map[int]map[int][]Subheading, error) {
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -240,7 +248,7 @@ func loadHeadings(db *sql.DB, query string) (map[int]map[int][]Subheading, error
 		if !ok || chapter < 1 {
 			continue
 		}
-		runs := headingRuns(text.String)
+		runs := headingRuns(text.String, bookName)
 		heading := headingText(runs)
 		if !hasLetterOrDigit(heading) {
 			continue // a Subheading that is nothing but punctuation or a broken reference says nothing

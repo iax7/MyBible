@@ -47,6 +47,40 @@ func TestBookNamesFallsBackToTheCanonicalName(t *testing.T) {
 	}
 }
 
+func TestBookDisplayName(t *testing.T) {
+	cases := []struct {
+		about string
+		book  Book
+		want  string
+	}{
+		{"the Module's long name", Book{Number: 10, Name: "Genesis", ShortName: "Gn", LongName: "Génesis"}, "Génesis"},
+		{"the long name without the Module's stray spaces", Book{Number: 10, Name: "Genesis", LongName: "  Génesis  "}, "Génesis"},
+		{"the Canonical name when the Module has no long name", Book{Number: 10, Name: "Genesis"}, "Genesis"},
+		{"the Canonical name when the long name is blank", Book{Number: 10, Name: "Genesis", LongName: "  "}, "Genesis"},
+	}
+	for _, c := range cases {
+		if got := c.book.DisplayName(); got != c.want {
+			t.Errorf("%s: DisplayName() = %q, want %q", c.about, got, c.want)
+		}
+	}
+}
+
+func TestBookNamesIncludesTheDisplayedName(t *testing.T) {
+	book := Book{Number: 10, Name: "Genesis", ShortName: "Gn", LongName: "Génesis"}
+	names := book.Names()
+	for _, want := range []string{"Genesis", "Gn", "Génesis"} {
+		found := false
+		for _, name := range names {
+			if name == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Book.Names() = %v, missing %q", names, want)
+		}
+	}
+}
+
 func TestClassificationOf(t *testing.T) {
 	cases := []struct {
 		number int
