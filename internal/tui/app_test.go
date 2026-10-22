@@ -191,6 +191,11 @@ func TestHelpListsEveryMovementAndCommandKey(t *testing.T) {
 			t.Errorf("help is missing the keybinding %s %s\n%s", c.Key, c.Label, got)
 		}
 	}
+
+	key := m.styles.subheading.Render(pad(MovementCommands[0].Key, 10))
+	if raw := m.modalView(); !strings.Contains(raw, key) {
+		t.Errorf("the help keys are not drawn in cyan\n%s", ansi.ReplaceAllString(raw, ""))
+	}
 }
 
 func TestQuitLeavesTheProgram(t *testing.T) {

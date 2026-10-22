@@ -35,7 +35,8 @@ type choice struct {
 	cursor    int
 	err       string
 	completed bool // the completion shortcut already wrote a Book: the menu stays out of the way
-	width     int  // the widest the Reference modal has had to be, so it grows but never shrinks
+	width     int  // the widest the modal has grown to, so it grows but never shrinks
+	height    int  // the tallest the modal has grown to, so it grows but never shrinks
 }
 
 func (c choice) isOpen() bool { return c.kind != pickerNone }
@@ -287,9 +288,7 @@ func (m Model) openPicker(kind pickerKind) Model {
 		m.picker.cursor = cursor(m)
 	}
 	m.picker.clamp(len(m.pickerMatches()))
-	if kind == pickerReference {
-		m.picker.width = m.referenceNeeds()
-	}
+	m.picker.remember(m)
 	return m
 }
 
@@ -332,11 +331,25 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.picker.isOpen() {
 		m.picker.clamp(len(m.pickerMatches()))
-		if m.picker.kind == pickerReference {
-			m.picker.width = max(m.picker.width, m.referenceNeeds())
-		}
+		m.picker.remember(m)
 	}
 	return m, nil
+}
+
+// remember keeps a modal the size it has grown to: it records the widest and
+// tallest the modal has been, so a query that narrows the list never shrinks the
+// box under the reader's eyes. The Reference modal measures its own width; a
+// list modal measures the lines of its body.
+func (c *choice) remember(m Model) {
+	if c.kind == pickerReference {
+		c.width = max(c.width, m.referenceNeeds())
+		return
+	}
+	lines := m.pickerBodyLines()
+	c.height = max(c.height, len(lines))
+	for _, line := range lines {
+		c.width = max(c.width, lipgloss.Width(line))
+	}
 }
 
 // pickerTypes reports whether keystrokes go into the open modal's query. The Log
@@ -587,19 +600,36 @@ func (m Model) pickerView() string {
 	if m.picker.kind == pickerReference {
 		return m.referencePickerView()
 	}
+	body := strings.Join(m.pickerFitted(m.pickerBodyLines()), "\n")
+	return m.styles.frameBox(m.pickerTitle(), keyClose, body)
+}
 
-	var b strings.Builder
+// pickerBodyLines is a list modal's content as lines: the filter line above the
+// matching rows, then any error or the footer hint.
+func (m Model) pickerBodyLines() []string {
+	var lines []string
 	if m.pickerTypes() {
-		b.WriteString(m.pickerFilterLine())
-		b.WriteString("\n\n")
+		lines = append(lines, m.pickerFilterLine(), "")
 	}
-	b.WriteString(m.pickerRowLines())
+	if rows := strings.TrimRight(m.pickerRowLines(), "\n"); rows != "" {
+		lines = append(lines, strings.Split(rows, "\n")...)
+	}
 	if m.picker.err != "" {
-		b.WriteString("\n" + m.styles.warning.Render(m.picker.err))
+		lines = append(lines, m.styles.warning.Render(m.picker.err))
 	}
-	b.WriteString("\n" + m.styles.hint.Render(m.translate(keyEnter+" to select")))
+	return append(lines, m.styles.hint.Render(m.translate(keyEnter+" to select")))
+}
 
-	return m.styles.frameBox(m.pickerTitle(), keyClose, strings.TrimRight(b.String(), "\n"))
+// pickerFitted pads a list modal's body out to the widest and tallest it has
+// grown to, so filtering the list does not resize the box.
+func (m Model) pickerFitted(lines []string) []string {
+	for len(lines) < m.picker.height {
+		lines = append(lines, "")
+	}
+	for i, line := range lines {
+		lines[i] = line + strings.Repeat(" ", max(0, m.picker.width-lipgloss.Width(line)))
+	}
+	return lines
 }
 
 // pickerRowLines is a modal's matching rows, windowed around the cursor, or the

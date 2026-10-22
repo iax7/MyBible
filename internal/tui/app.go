@@ -272,6 +272,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.commentaryModal.open {
 			m = m.openCommentaryAt(m.commentaryModal.reference)
 		}
+		if m.picker.isOpen() { // the modal's size may no longer fit the new screen
+			m.picker.width, m.picker.height = 0, 0
+			m.picker.remember(m)
+		}
 
 	case tea.KeyPressMsg:
 		key := msg.String()
@@ -612,22 +616,39 @@ func wrapParts(parts []string, width int) []string {
 
 // helpView is the modal listing every keybinding, centred on the screen.
 func (m Model) helpView() string {
-	var b strings.Builder
-	b.WriteString(m.styles.label.Render(m.translate("Movement")) + "\n")
-	for _, c := range MovementCommands {
-		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
-	}
-	b.WriteString("\n" + m.styles.label.Render(m.translate("Commands")) + "\n")
-	for _, c := range Commands {
-		b.WriteString(binding(m.styles, c.Key, m.translate(c.Label)))
-	}
-	b.WriteString(binding(m.styles, keyClose, m.translate("Close")))
+	s := m.styles
+	s.key = m.styles.subheading // the modal's keys wear the theme's cyan
 
-	return m.styles.frameBox(m.translate("Keys"), keyClose, strings.TrimRight(b.String(), "\n"))
+	bindings := func(cmds []Command) []string {
+		lines := make([]string, 0, len(cmds))
+		for _, c := range cmds {
+			lines = append(lines, binding(s, c.Key, m.translate(c.Label)))
+		}
+		return lines
+	}
+	movement, commands := bindings(MovementCommands), bindings(Commands)
+	width := 0
+	for _, lines := range [][]string{movement, commands} {
+		for _, line := range lines {
+			width = max(width, lipgloss.Width(line))
+		}
+	}
+	heading := func(title string) string {
+		return center(m.styles.key.Render(m.translate(title)), width)
+	}
+
+	var b strings.Builder
+	b.WriteString(heading("Movement") + "\n")
+	b.WriteString(strings.Join(movement, "\n") + "\n\n")
+	b.WriteString(heading("Commands") + "\n")
+	b.WriteString(strings.Join(commands, "\n") + "\n")
+	b.WriteString(binding(s, keyClose, m.translate("Close")))
+
+	return m.styles.frameBox(m.translate("Keys"), keyClose, b.String())
 }
 
 func binding(s styles, key, label string) string {
-	return s.key.Render(pad(key, 10)) + s.label.Render(label) + "\n"
+	return s.key.Render(pad(key, 10)) + s.label.Render(label)
 }
 
 func pad(s string, width int) string {
