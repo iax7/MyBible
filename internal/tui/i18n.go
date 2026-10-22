@@ -31,8 +31,7 @@ var spanish = map[string]string{
 	"Keys":            "Teclas",
 	"Movement":        "Movimiento",
 	"Commands":        "Comandos",
-	"Back":            "Atrás",
-	"Forward":         "Adelante",
+	"Back/Forward":    "Atrás/Adelante",
 	"Toggle top bar":  "Mostrar u ocultar la barra",
 	"Close":           "Cerrar",
 

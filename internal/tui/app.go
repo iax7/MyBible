@@ -32,8 +32,7 @@ var Commands = []Command{
 	{"H", "History"},
 	{keyLog, "Log"},
 	{keyToggleBar, "Toggle top bar"},
-	{keyBack, "Back"},
-	{keyForward, "Forward"},
+	{keyHistoryKeys, "Back/Forward"},
 	{"?", "Help"},
 	{"q", "Quit"},
 }
@@ -97,8 +96,9 @@ const (
 
 // Keys that walk the History. A jump records an entry; these retrace them.
 const (
-	keyBack    = "alt+left"
-	keyForward = "alt+right"
+	keyBack        = "alt+left"
+	keyForward     = "alt+right"
+	keyHistoryKeys = "alt+←/→" // how Help names the History keys
 )
 
 // Modal titles.
