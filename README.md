@@ -12,6 +12,18 @@ settling, so there are no published binaries yet.
 
 Requires Go 1.27.2 or newer: the floor `go.mod` sets, and the 1.27 line `mise.toml` installs.
 
+The simplest way to get that Go is [mise](https://mise.jdx.dev), which reads
+`mise.toml` and installs the pinned toolchain:
+
+```sh
+mise install
+mise exec -- go build ./cmd/mybible
+```
+
+Or, inside the directory, `mise activate` / `mise shell` once and use plain `go`.
+
+With a system Go already at 1.27.2+:
+
 ```sh
 go build ./cmd/mybible
 ./mybible
