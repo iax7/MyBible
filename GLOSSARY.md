@@ -73,6 +73,10 @@ _Avoid_: Cross-reference, citation, hyperlink
 The address of a Verse or a range of Verses — book, chapter, verse — used to name a location in navigation history and search results.
 _Avoid_: Citation, location, pointer
 
+**Reading position**:
+The Reference of the cursor while the reader is open. A translation switch keeps it whenever the new Translation contains that Reference.
+_Avoid_: Cursor position, current verse
+
 **Active translation**:
 The Translation currently displayed. The reader shows exactly one at a time.
 _Avoid_: Current version, selected module

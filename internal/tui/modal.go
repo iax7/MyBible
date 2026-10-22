@@ -145,8 +145,14 @@ var pickers = [...]pickerSpec{
 		},
 		confirm: func(m Model, value int) Model {
 			if value >= 0 && value < len(m.translations) {
+				reference, had := m.currentReference()
 				m.active = m.translations[value].Abbreviation
 				m = m.loadActive()
+				if had {
+					// A Reference the new Translation lacks leaves the reader
+					// at the first Chapter loadActive opened.
+					m, _ = m.jumpTo(reference)
+				}
 				m = m.persist()
 			}
 			return m

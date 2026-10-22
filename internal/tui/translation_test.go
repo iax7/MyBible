@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/iax7/mybible/internal/config"
 	"github.com/iax7/mybible/internal/modtest"
@@ -109,6 +110,27 @@ func TestTheTranslationPickerIsFilterable(t *testing.T) {
 	}
 }
 
+// Filtering a list modal must not resize it: the box keeps the size it had when
+// the whole list was shown, so it does not flicker under the reader's eyes.
+func TestTheTranslationPickerOnlyGrows(t *testing.T) {
+	dir := t.TempDir()
+	modtest.Bible(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909 Reina-Valera Actualizada"})
+	modtest.Bible(t, dir, "KJV.SQLite3", map[string]string{"description": "King James Version"})
+
+	m := newReader(t, t.TempDir(), dir)
+	m, _ = send(t, m, press('t', "t", 0))
+	width, height := lipgloss.Width(m.modalView()), lipgloss.Height(m.modalView())
+
+	// "king" drops the wider row; the box must hold its size.
+	m = typeKey(t, m, "king")
+	if got := lipgloss.Width(m.modalView()); got != width {
+		t.Errorf("the picker changed width to %d while typing, from %d", got, width)
+	}
+	if got := lipgloss.Height(m.modalView()); got != height {
+		t.Errorf("the picker changed height to %d while typing, from %d", got, height)
+	}
+}
+
 func TestTheTranslationPickerClosesOnEscape(t *testing.T) {
 	dir := t.TempDir()
 	modtest.Bible(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"})
@@ -176,6 +198,69 @@ func TestACorruptModuleIsSkippedWithAWarning(t *testing.T) {
 	if got := render(t, m); !strings.Contains(got, "Reina-Valera 1909") {
 		t.Errorf("the remaining Translation did not load\n%s", got)
 	}
+}
+
+// switchReader is a reader on KJV holding two Translations that share Genesis
+// but differ elsewhere: RST has no Exodus, so a switch can land or fall back.
+func switchReader(t *testing.T) Model {
+	t.Helper()
+	dir := t.TempDir()
+	genesis := []modtest.Verse{
+		{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"},
+		{Book: 10, Chapter: 1, Verse: 2, Text: "And the earth was"},
+		{Book: 10, Chapter: 1, Verse: 3, Text: "And God said"},
+	}
+	gen := []modtest.Book{{Number: 10, ShortName: "Gen", LongName: "Genesis"}}
+	modtest.BibleBooks(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"}, gen, genesis)
+	modtest.BibleBooks(t, dir, "KJV.SQLite3", map[string]string{"description": "King James Version"},
+		append(gen, modtest.Book{Number: 20, ShortName: "Exo", LongName: "Exodus"}),
+		append(genesis, modtest.Verse{Book: 20, Chapter: 1, Verse: 1, Text: "Now these are the names"}))
+
+	configDir := t.TempDir()
+	if err := config.Save(configDir, config.Config{ModuleDir: dir, ActiveTranslation: "KJV"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	return newReader(t, configDir, dir)
+}
+
+// switchTo picks a Translation through the picker's filter.
+func switchTo(t *testing.T, m Model, filter string) Model {
+	t.Helper()
+	m, _ = send(t, m, press('t', "t", 0))
+	m = typeKey(t, m, filter)
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+	return m
+}
+
+func TestSwitchingTranslationKeepsTheReadingPosition(t *testing.T) {
+	m := switchReader(t)
+	m = goTo(t, m, "Genesis 1:3")
+
+	m = switchTo(t, m, "reina")
+
+	assertReference(t, m, "Genesis 1:3")
+	if got := render(t, m); !strings.Contains(got, "And God said") {
+		t.Errorf("the new Translation did not open at Genesis 1:3\n%s", got)
+	}
+}
+
+func TestSwitchingTranslationFallsBackWhenThePositionIsMissing(t *testing.T) {
+	m := switchReader(t)
+	m = goTo(t, m, "Exodus 1:1")
+
+	m = switchTo(t, m, "reina")
+
+	assertReference(t, m, "Genesis 1:1") // RST has no Exodus
+}
+
+func TestSwitchingTranslationIsNotAVisit(t *testing.T) {
+	m := switchReader(t)
+	m = goTo(t, m, "Genesis 1:3")
+
+	m = switchTo(t, m, "reina")
+	m = back(t, m)
+
+	assertReference(t, m, "Genesis 1:1") // the goTo's origin: the switch added no Visit
 }
 
 func TestABrokenStoriesTableIsReportedInTheLog(t *testing.T) {
