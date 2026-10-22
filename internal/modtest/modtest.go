@@ -121,6 +121,29 @@ func Subheadings(t testing.TB, dir, filename string, info map[string]string, sub
 	return Create(t, dir, filename, statements...)
 }
 
+// Stories adds a stories table to the Bible Module at path and inserts the given
+// Subheadings, the way a Translation carries the headings of its printed
+// edition. The Module must already exist.
+func Stories(t testing.TB, path string, subheadings []Subheading) {
+	t.Helper()
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("modtest: open %s: %v", path, err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec(`CREATE TABLE stories (book_number NUMERIC, chapter NUMERIC, verse NUMERIC, order_if_several NUMERIC, title TEXT, PRIMARY KEY (book_number, chapter, verse, order_if_several))`); err != nil {
+		t.Fatalf("modtest: create stories: %v", err)
+	}
+	for _, s := range subheadings {
+		if _, err := db.Exec("INSERT INTO stories (book_number, chapter, verse, order_if_several, title) VALUES (?, ?, ?, ?, ?)",
+			s.Book, s.Chapter, s.Verse, s.Order, s.Text); err != nil {
+			t.Fatalf("modtest: insert story: %v", err)
+		}
+	}
+}
+
 // Commentary is one row of a synthetic Commentary Module.
 type Commentary struct {
 	Book        int

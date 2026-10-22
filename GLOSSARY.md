@@ -38,7 +38,7 @@ Words a Translation supplies to the base text for clarity or grammar, marked in 
 _Avoid_: Added text, italics, emphasis
 
 **Subheading**:
-A short heading introducing the Verses that follow it, held in a Module of its own rather than in the Bible text.
+A short heading introducing the Verses that follow it, drawn in the theme's quiet cyan. A Translation carries its own, or a companion Subheadings Module supplies them instead.
 _Avoid_: Subtitle, section title, heading
 
 **Commentary**:
@@ -58,7 +58,7 @@ The Active commentary's abbreviation, shown at the end of every Verse it covers.
 _Avoid_: Marker, badge, tag
 
 **Verse link**:
-A Reference written inside Commentary text, underlined and green so the reader can see it is a way to that Verse.
+A Reference written inside Commentary text or under a Subheading, underlined and green so the reader can see it names a Verse.
 _Avoid_: Cross-reference, citation, hyperlink
 
 **Reference**:

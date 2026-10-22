@@ -32,6 +32,7 @@ const (
 	tableInfo        = "info"
 	tableBooks       = "books"
 	tableBooksAll    = "books_all"
+	tableStories     = "stories"
 	tableVerses      = "verses"
 	tableSubheadings = "subheadings"
 )

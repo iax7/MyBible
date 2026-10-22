@@ -45,9 +45,13 @@ from somewhere else, set `module_directory` in the config file. Module files are
 opened read-only and are never modified or copied. Module content is mixed-license
 and mostly not redistributable, so no module file belongs in this repository.
 
-Subheadings are read too: a `subheadings` module named after its Bible
-(`RV60-s.subheadings.SQLite3` belongs to `RV60.SQLite3`) is paired with it
-automatically, and its headings render above the verses they introduce.
+Subheadings are read too. A Translation carries its own in the module's
+`stories` table — the section titles of the printed edition, as `NBLA'05` does
+— or a `subheadings` module named after its Bible supplies them
+(`RV60-s.subheadings.SQLite3` belongs to `RV60.SQLite3`). The companion wins when
+it can be read; the Translation's own headings are the fallback. Either way they
+render above the verses they introduce, and a table that cannot be read is
+reported in the Log.
 
 Commentary modules are found by their declared type, not by file name: every
 module the file calls a `commentaries` module is offered under `m`, whichever

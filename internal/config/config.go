@@ -33,19 +33,20 @@ type Config struct {
 // Colors overrides individual theme colors. An empty field keeps the theme's
 // own color; a value is an ANSI256 number or a hex color.
 type Colors struct {
-	Bar       string `toml:"bar"`
-	BarText   string `toml:"bar_text"`
-	Key       string `toml:"key"`
-	Label     string `toml:"label"`
-	Reference string `toml:"reference"`
-	Warning   string `toml:"warning"`
-	Italics   string `toml:"italics"`
-	Jesus     string `toml:"jesus"`
-	VerseNum  string `toml:"verse_num"`
-	CursorNum string `toml:"cursor_num"`
-	Hint      string `toml:"hint"`
-	Field     string `toml:"field"`
-	Link      string `toml:"link"`
+	Bar        string `toml:"bar"`
+	BarText    string `toml:"bar_text"`
+	Key        string `toml:"key"`
+	Label      string `toml:"label"`
+	Reference  string `toml:"reference"`
+	Warning    string `toml:"warning"`
+	Italics    string `toml:"italics"`
+	Jesus      string `toml:"jesus"`
+	VerseNum   string `toml:"verse_num"`
+	CursorNum  string `toml:"cursor_num"`
+	Hint       string `toml:"hint"`
+	Field      string `toml:"field"`
+	Link       string `toml:"link"`
+	Subheading string `toml:"subheading"`
 }
 
 // Dir returns the directory holding the reader's configuration.

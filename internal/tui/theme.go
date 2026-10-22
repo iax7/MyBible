@@ -25,38 +25,40 @@ type Palette struct {
 var (
 	darkPalette = Palette{
 		Colors: config.Colors{
-			Bar:       "#0B0B0B",
-			BarText:   "#D7D7D7",
-			Key:       "#96DC5A",
-			Label:     "#D7D7D7",
-			Reference: "#D7D7D7",
-			Warning:   "#FF9146",
-			Italics:   "#8C8C8C",
-			Jesus:     "#FF5F6E",
-			VerseNum:  "#898989",
-			CursorNum: "#96DC5A",
-			Hint:      "#6C6C6C",
-			Field:     "#2A2A2A",
-			Link:      "#96DC5A",
+			Bar:        "#0B0B0B",
+			BarText:    "#D7D7D7",
+			Key:        "#96DC5A",
+			Label:      "#D7D7D7",
+			Reference:  "#D7D7D7",
+			Warning:    "#FF9146",
+			Italics:    "#8C8C8C",
+			Jesus:      "#FF5F6E",
+			VerseNum:   "#898989",
+			CursorNum:  "#96DC5A",
+			Hint:       "#6C6C6C",
+			Field:      "#2A2A2A",
+			Link:       "#96DC5A",
+			Subheading: "#5FD7D7",
 		},
 		Bold:     "#FFFFFF",
 		Emphasis: "#2A2A2A",
 	}
 	lightPalette = Palette{
 		Colors: config.Colors{
-			Bar:       "189",
-			BarText:   "235",
-			Key:       "25",
-			Label:     "240",
-			Reference: "236",
-			Warning:   "130",
-			Italics:   "243",
-			Jesus:     "160",
-			VerseNum:  "245",
-			CursorNum: "25",
-			Hint:      "248",
-			Field:     "253",
-			Link:      "28",
+			Bar:        "189",
+			BarText:    "235",
+			Key:        "25",
+			Label:      "240",
+			Reference:  "236",
+			Warning:    "130",
+			Italics:    "243",
+			Jesus:      "160",
+			VerseNum:   "245",
+			CursorNum:  "25",
+			Hint:       "248",
+			Field:      "253",
+			Link:       "28",
+			Subheading: "30",
 		},
 		Bold:     "16",
 		Emphasis: "253",
@@ -131,6 +133,7 @@ func paletteFor(theme string, overrides config.Colors) Palette {
 	set(&p.Hint, overrides.Hint)
 	set(&p.Field, overrides.Field)
 	set(&p.Link, overrides.Link)
+	set(&p.Subheading, overrides.Subheading)
 	return p
 }
 
@@ -153,9 +156,9 @@ type styles struct {
 	field          lipgloss.Style // the Reference modal's input line, a filled band that marks where typing lands
 	popup          lipgloss.Style // the Reference modal's completion menu
 	popupKey       lipgloss.Style // the menu's highlighted row
-	subheading     lipgloss.Style
+	subheading     lipgloss.Style // a Subheading's own words: bold, in the quieter cyan
 	commentaryBold lipgloss.Style // the Commentary's <b> text: bold white on a quiet band
-	link           lipgloss.Style // a Commentary's verse link: green and underlined
+	link           lipgloss.Style // a Verse link: green and underlined, in Commentary and under a Subheading
 	bookColor      bookPalette
 }
 
@@ -178,7 +181,7 @@ func newStyles(p Palette, bookColors bookPalette) styles {
 		field:      lipgloss.NewStyle().Background(lipgloss.Color(p.Field)).Foreground(lipgloss.Color(p.Label)),
 		popup:      lipgloss.NewStyle().Background(lipgloss.Color(p.Bar)).Foreground(lipgloss.Color(p.BarText)),
 		popupKey:   lipgloss.NewStyle().Background(lipgloss.Color(p.Bar)).Foreground(lipgloss.Color(p.Key)).Bold(true),
-		subheading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Key)),
+		subheading: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(p.Subheading)),
 		commentaryBold: lipgloss.NewStyle().Bold(true).
 			Foreground(lipgloss.Color(p.Bold)).
 			Background(lipgloss.Color(p.Emphasis)),

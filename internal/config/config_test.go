@@ -25,7 +25,7 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 		LastReference:     "John 3:16",
 		Theme:             "light",
 		Language:          "es",
-		Colors:            Colors{Jesus: "9", Link: "28"},
+		Colors:            Colors{Jesus: "9", Link: "28", Subheading: "30"},
 	}
 
 	if err := Save(dir, want); err != nil {

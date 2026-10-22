@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/iax7/mybible/internal/config"
 	"github.com/iax7/mybible/internal/modtest"
 )
@@ -158,6 +160,36 @@ func TestTranslatorWordsInsideTheWordsOfJesusStayQuiet(t *testing.T) {
 	}
 	if !strings.Contains(got, m.styles.jesus.Render("a ")) {
 		t.Errorf("the words of Jesus around the added word lost their red\n%q", got)
+	}
+}
+
+// A Subheading's own words are the quieter cyan, while its Verse links keep the
+// Commentary's green underline. The two colors are independently configurable.
+func TestSubheadingsAreCyanAndLinksStayGreen(t *testing.T) {
+	dark := themedReader(t, "dark", config.Colors{})
+	darkHeading := dark.styles.subheading.Render("x")
+	if !strings.Contains(darkHeading, "38;2;95;215;215") {
+		t.Errorf("the dark theme's Subheading is not #5FD7D7: %q", darkHeading)
+	}
+	if !dark.styles.subheading.GetBold() {
+		t.Error("the Subheading is not bold")
+	}
+	if got := dark.styles.link.Render("x"); !strings.Contains(got, "38;2;150;220;90") || !dark.styles.link.GetUnderline() {
+		t.Errorf("the dark theme's Verse link is not the green underline: %q", got)
+	}
+
+	light := themedReader(t, "light", config.Colors{})
+	wantLight := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("30")).Render("x")
+	if got := light.styles.subheading.Render("x"); got != wantLight {
+		t.Errorf("the light theme's Subheading = %q, want ANSI 30 dark cyan (%q)", got, wantLight)
+	}
+
+	overridden := themedReader(t, "dark", config.Colors{Subheading: "9"})
+	if got := overridden.styles.subheading.Render("x"); !strings.Contains(got, "91") {
+		t.Errorf("the Subheading color override was ignored: %q", got)
+	}
+	if got := overridden.styles.link.Render("x"); !strings.Contains(got, "38;2;150;220;90") {
+		t.Errorf("overriding subheading changed the Verse link: %q", got)
 	}
 }
 

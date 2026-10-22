@@ -63,7 +63,7 @@ func (m Model) renderLines() chapterLines {
 			out.from = len(out.lines)
 		}
 		for _, subheading := range subheadings[verse.Number] {
-			out.lines = append(out.lines, m.styles.subheading.Render(subheading.Text))
+			out.lines = append(out.lines, m.renderSubheading(subheading))
 		}
 		number := strconv.Itoa(verse.Number)
 		numStyle := m.styles.verseNum
@@ -114,6 +114,25 @@ func (m Model) chapterSubheadings() map[int][]module.Subheading {
 		byVerse[subheading.Verse] = append(byVerse[subheading.Verse], subheading)
 	}
 	return byVerse
+}
+
+// renderSubheading draws one Subheading: its plain words in the quiet cyan
+// heading style and each Verse link label in the Commentary's green link style.
+// A Subheading with no Runs falls back to its flattened text, so an older caller
+// still draws.
+func (m Model) renderSubheading(subheading module.Subheading) string {
+	if len(subheading.Runs) == 0 {
+		return m.styles.subheading.Render(subheading.Text)
+	}
+	var b strings.Builder
+	for _, run := range subheading.Runs {
+		style := m.styles.subheading
+		if run.Link {
+			style = m.styles.link
+		}
+		b.WriteString(style.Render(run.Text))
+	}
+	return b.String()
 }
 
 // center pads text with spaces so it sits in the middle of width cells.

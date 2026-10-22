@@ -213,6 +213,65 @@ func TestReadingShowsASubheadingAboveItsVerse(t *testing.T) {
 	}
 }
 
+func TestReadingShowsSubheadingVerseLinksLikeCommentaryLinks(t *testing.T) {
+	dir := t.TempDir()
+	path := modtest.BibleAll(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"}, genesis(),
+		[]modtest.Verse{
+			{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"},
+			{Book: 10, Chapter: 1, Verse: 2, Text: "And the earth was without form"},
+		})
+	modtest.Stories(t, path, []modtest.Subheading{{Book: 10, Chapter: 1, Verse: 2, Order: 1, Text: "The <x>10 1:2</x> fall"}})
+
+	configDir := t.TempDir()
+	if err := config.Save(configDir, config.Config{ModuleDir: dir, ActiveTranslation: "RST"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	m := newReader(t, configDir, dir)
+	if got := render(t, m); !hasSequence(got, "The Genesis 1:2 fall", "2 And the earth was without form") {
+		t.Errorf("the Subheading link label is not on its own line above its Verse\n%s", got)
+	}
+
+	plain := m.styles.subheading.Render("The ")
+	link := m.styles.link.Render("Genesis 1:2")
+	tail := m.styles.subheading.Render(" fall")
+	if got := m.View().Content; !strings.Contains(got, plain+link+tail) {
+		t.Errorf("the Subheading does not draw its plain text and link label with their own styles\n%q", got)
+	}
+	if !strings.Contains(link, "38;2;150;220;90") || !m.styles.link.GetUnderline() {
+		t.Errorf("the Subheading link is not the Commentary's green underline: %q", link)
+	}
+	if link == m.styles.subheading.Render("Genesis 1:2") {
+		t.Error("the Subheading link takes the heading style instead of the link style")
+	}
+	if !strings.Contains(plain, "38;2;95;215;215") || !m.styles.subheading.GetBold() {
+		t.Errorf("the Subheading's own words are not the bold cyan heading: %q", plain)
+	}
+	if plain == m.styles.link.Render("The ") {
+		t.Error("the Subheading's plain text takes the link style")
+	}
+}
+
+func TestReadingShowsTheBiblesOwnSubheading(t *testing.T) {
+	dir := t.TempDir()
+	path := modtest.BibleAll(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"}, genesis(),
+		[]modtest.Verse{
+			{Book: 10, Chapter: 1, Verse: 1, Text: "In the beginning"},
+			{Book: 10, Chapter: 1, Verse: 2, Text: "And the earth was without form"},
+		})
+	modtest.Stories(t, path, []modtest.Subheading{{Book: 10, Chapter: 1, Verse: 2, Order: 1, Text: "The creation"}})
+
+	configDir := t.TempDir()
+	if err := config.Save(configDir, config.Config{ModuleDir: dir, ActiveTranslation: "RST"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	got := render(t, newReader(t, configDir, dir))
+	if !hasSequence(got, "The creation", "2 And the earth was without form") {
+		t.Errorf("the Translation's own Subheading is not on its own line above its Verse\n%s", got)
+	}
+}
+
 func TestSelectingATranslationLoadsItsChapter(t *testing.T) {
 	dir := t.TempDir()
 	modtest.BibleAll(t, dir, "KJV.SQLite3", map[string]string{"description": "King James Version"}, genesis(),

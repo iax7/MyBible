@@ -248,7 +248,8 @@ func (m Model) loadActive() Model {
 	if !ok {
 		return m
 	}
-	text, err := t.Load()
+	text, warnings, err := t.Load()
+	m.warnings = append(m.warnings, warnings...)
 	if err != nil {
 		m.warnings = append(m.warnings, fmt.Sprintf("%s: %v", t.Abbreviation, err))
 		return m

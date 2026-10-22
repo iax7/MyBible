@@ -177,3 +177,35 @@ func TestACorruptModuleIsSkippedWithAWarning(t *testing.T) {
 		t.Errorf("the remaining Translation did not load\n%s", got)
 	}
 }
+
+func TestABrokenStoriesTableIsReportedInTheLog(t *testing.T) {
+	dir := t.TempDir()
+	modtest.Create(t, dir, "RST.SQLite3",
+		`CREATE TABLE info (name TEXT, value TEXT)`,
+		`INSERT INTO info (name, value) VALUES ('description', 'Reina-Valera 1909')`,
+		`CREATE TABLE books (book_number NUMERIC, book_color TEXT, short_name TEXT, long_name TEXT, sorting_order NUMERIC)`,
+		`INSERT INTO books (book_number, short_name, long_name) VALUES (10, 'Gen', 'Genesis')`,
+		`CREATE TABLE verses (book_number NUMERIC, chapter NUMERIC, verse NUMERIC, text TEXT)`,
+		`INSERT INTO verses (book_number, chapter, verse, text) VALUES (10, 1, 1, 'In the beginning')`,
+		`CREATE TABLE stories (book_number NUMERIC)`,
+	)
+
+	configDir := t.TempDir()
+	if err := config.Save(configDir, config.Config{ModuleDir: dir, ActiveTranslation: "RST"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	m := newReader(t, configDir, dir)
+	if got := render(t, m); strings.Contains(got, "stories") {
+		t.Errorf("the reading pane shows a warning\n%s", got)
+	}
+	m, _ = send(t, m, press('L', "L", 0))
+	if got := render(t, m); !strings.Contains(got, "cannot read the stories table") {
+		t.Errorf("the broken stories table is not reported in the Log\n%s", got)
+	}
+	m, _ = send(t, m, press(tea.KeyEscape, "", 0))
+
+	if got := render(t, m); !strings.Contains(got, "1 In the beginning") {
+		t.Errorf("the Bible did not stay readable\n%s", got)
+	}
+}
