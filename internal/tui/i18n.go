@@ -45,12 +45,13 @@ var spanish = map[string]string{
 	"Bottom of Chapter": "Final del capítulo",
 
 	// Modal titles.
-	"Select Translation": "Seleccionar traducción",
-	"Select Commentary":  "Seleccionar comentario",
-	"Select Book":        "Seleccionar libro",
-	"Select Chapter":     "Seleccionar capítulo",
-	"Go to Reference":    "Ir a la referencia",
-	"Log":                "Registro",
+	"Select Translation":         "Seleccionar traducción",
+	"Select Abbreviation Source": "Seleccionar origen de abreviaturas",
+	"Select Commentary":          "Seleccionar comentario",
+	"Select Book":                "Seleccionar libro",
+	"Select Chapter":             "Seleccionar capítulo",
+	"Go to Reference":            "Ir a la referencia",
+	"Log":                        "Registro",
 
 	// Modal bodies.
 	"Type to search":                       "Escribe para buscar",

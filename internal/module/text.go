@@ -147,6 +147,31 @@ func (t Translation) Load() (*Text, []string, error) {
 	return text, warnings, nil
 }
 
+// Books reads the Translation's Book rows without loading its Verses, so the
+// reader can copy the Module's own book abbreviations without loading a Bible.
+func (t Translation) Books() ([]Book, error) {
+	db, err := openReadOnly(t.path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = db.Close() }()
+
+	tables, err := moduleTables(db)
+	if err != nil {
+		return nil, err
+	}
+	byNumber, err := moduleBooks(db, tables)
+	if err != nil {
+		return nil, err
+	}
+	books := make([]Book, 0, len(byNumber))
+	for _, book := range byNumber {
+		books = append(books, book)
+	}
+	sort.Slice(books, func(i, j int) bool { return books[i].Number < books[j].Number })
+	return books, nil
+}
+
 // Books returns the loaded Translation's Books in Canonical order.
 func (t *Text) Books() []Book {
 	books := make([]Book, len(t.books))

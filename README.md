@@ -5,7 +5,7 @@ A terminal (TUI) Bible reader for Linux that reads [MyBible](https://mybible.zon
 MyBible stores each translation as a `.SQLite3` file. This reader opens those files
 read-only — no import, no second copy, no new library to maintain.
 
-**Status: 0.0.2, pre-release.** The module format handling and the interface are still
+**Status: 0.1.0, pre-release.** The module format handling and the interface are still
 settling, so there are no published binaries yet.
 
 ## Build and run
@@ -62,10 +62,19 @@ from somewhere else, set `module_directory` in the config file. Module files are
 opened read-only and are never modified or copied. Module content is mixed-license
 and mostly not redistributable, so no module file belongs in this repository.
 
-Book names come from the Module, not from the reader: a Spanish Translation lists
-`Gn · Génesis` and completes `Génesis`. The built-in English name still works as
-input — `Genesis 3:16` reaches the same Verse — and a Book's number is what
-identifies it, so changing translations keeps your place.
+By default, Book names come from the Module, not from the reader: a Spanish
+Translation lists `Gn · Génesis` and completes `Génesis`. The built-in English
+name still works as input — `Genesis 3:16` reaches the same Verse — and a Book's
+number is what identifies it, so changing translations keeps your place.
+
+To keep one set of abbreviations across translations, set
+`preferred_abbreviations = true` in the config. When no set exists yet, the next
+start asks which translation to copy the abbreviations from, then stores them in
+`preferred.abbreviations.json` beside `config.toml` (in `~/.config/mybible` by
+default); edit that file to taste. The file uses MyBible's desired-abbreviation
+format, so it can be shared with the Android app: to start from one of its sets,
+copy it to that path. A Book with no entry keeps the module's abbreviation, and
+turning the option off leaves the reader exactly as it was.
 
 Subheadings are read too. A Translation carries its own in the module's
 `stories` table — the section titles of the printed edition, as `NBLA'05` does

@@ -103,15 +103,16 @@ const (
 
 // Modal titles.
 const (
-	selectTranslation = "Select Translation"
-	selectCommentary  = "Select Commentary"
-	selectBook        = "Select Book"
-	selectChapter     = "Select Chapter"
-	selectReference   = "Go to Reference"
-	searchTitle       = "Search"
-	historyTitle      = "History"
-	logTitle          = "Log"
-	commentaryTitle   = "Commentary"
+	selectTranslation        = "Select Translation"
+	selectAbbreviationSource = "Select Abbreviation Source"
+	selectCommentary         = "Select Commentary"
+	selectBook               = "Select Book"
+	selectChapter            = "Select Chapter"
+	selectReference          = "Go to Reference"
+	searchTitle              = "Search"
+	historyTitle             = "History"
+	logTitle                 = "Log"
+	commentaryTitle          = "Commentary"
 )
 
 const emptyReference = "—"
@@ -158,6 +159,8 @@ type Model struct {
 	cfg    config.Config // the loaded config, kept so saving state does not drop keys
 	lang   lang
 	styles styles
+
+	abbreviations config.Abbreviations // the Preferred abbreviation set, when enabled
 
 	text    Reader
 	book    module.Book
@@ -217,6 +220,23 @@ func New(opts Options) Model {
 		m.warnings = append(m.warnings, warnings...)
 	}
 
+	seedAbbreviations := false
+	if cfg.PreferredAbbreviations {
+		set, err := config.LoadAbbreviations(m.configDir)
+		switch {
+		case err != nil:
+			m.warnings = append(m.warnings, "preferred abbreviations: "+err.Error())
+		case len(set.ByBookNumber) == 0:
+			if len(m.translations) == 0 {
+				m.warnings = append(m.warnings, "preferred abbreviations: no Translation to copy from")
+			} else {
+				seedAbbreviations = true
+			}
+		default:
+			m.abbreviations = set
+		}
+	}
+
 	m.activeCommentary = cfg.ActiveCommentary
 	if _, ok := m.activeCommentaryModule(); !ok {
 		m.activeCommentary = ""
@@ -228,6 +248,9 @@ func New(opts Options) Model {
 	m.active = cfg.ActiveTranslation
 	if _, ok := m.activeTranslation(); !ok {
 		m.active = ""
+	}
+	if seedAbbreviations {
+		m = m.openPicker(pickerPreferredAbbreviations)
 	}
 	m = m.loadActive()
 

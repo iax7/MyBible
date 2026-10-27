@@ -1,7 +1,7 @@
-// Package config reads and writes the reader's TOML config file.
+// Package config reads and writes the reader's config: the TOML settings file
+// and the preferred abbreviation set, which uses MyBible's JSON format.
 //
-// The file lives in the XDG config directory; nothing else about the reader is
-// persisted here. Modules themselves are never touched.
+// Both live in the XDG config directory. Modules themselves are never touched.
 package config
 
 import (
@@ -27,7 +27,12 @@ type Config struct {
 	LastReference     string `toml:"last_reference"`
 	Theme             string `toml:"theme"`
 	Language          string `toml:"language"`
-	Colors            Colors `toml:"colors"`
+
+	// PreferredAbbreviations makes the reader use the Preferred abbreviation
+	// set stored beside this file instead of each Module's own short names.
+	PreferredAbbreviations bool `toml:"preferred_abbreviations"`
+
+	Colors Colors `toml:"colors"`
 }
 
 // Colors overrides individual theme colors. An empty field keeps the theme's

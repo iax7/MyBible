@@ -28,8 +28,12 @@ _Avoid_: Internal name, default name
 One entry in the Canonical book list. Its number identifies it across Translations; the name it is shown by comes from the Active translation.
 
 **Book name**:
-What the reader shows for a Book: the Module's own long name, abbreviated by its own short name. The Canonical name is the fallback when a Module carries no name.
+What the reader shows for a Book: the Module's own long name, abbreviated by the reader's Preferred abbreviation when it has one, or by the Module's own short name otherwise. The Canonical name is the fallback when a Module carries no name.
 _Avoid_: Display name, label, title
+
+**Preferred abbreviation**:
+An abbreviation the reader keeps for a Book, replacing the Module's own short name when the reader's abbreviation set is enabled. The set is seeded from one Translation and edited by the reader; a Book without a Preferred abbreviation keeps the Module's short name, and a set that names a language applies only to Translations in that language.
+_Avoid_: Canonical abbreviation, custom abbreviation, alias
 
 **Book classification**:
 The kind of writing a Book belongs to — the Pentateuch, the Historical books, the Poetic books, the Major prophets, the Minor prophets, the Gospels, Acts, the Epistles by Paul, the General Epistles, Revelation, or Non-canonical. MyBible colors its own book selector by it, and the reader colors a Book's name by it wherever the name is shown.

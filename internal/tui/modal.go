@@ -17,6 +17,7 @@ type pickerKind int
 const (
 	pickerNone pickerKind = iota
 	pickerTranslation
+	pickerPreferredAbbreviations
 	pickerCommentary
 	pickerBook
 	pickerChapter
@@ -44,8 +45,8 @@ func (c choice) isOpen() bool { return c.kind != pickerNone }
 // pickerItem is one row of a list modal: the text to show, the text to filter
 // by, and the value the row selects. head is the text that names a Book, colored
 // with style, so the Book stands out from the rest of the row; short is the
-// Module's own abbreviation for that Book, shown before the name and colored the
-// same way. A row that is not a Book has neither.
+// abbreviation the reader shows for that Book, colored the same way. A row that
+// is not a Book has neither.
 type pickerItem struct {
 	label  string
 	search string
@@ -73,23 +74,31 @@ type pickerSpec struct {
 
 // bookItems are the Active translation's Books as modal rows, in Canonical
 // order. The Select Book and Go to Reference modals list the same rows; only
-// what confirming one does differs.
+// what confirming one does differs. Each row shows the abbreviation the reader
+// prefers for the Book, or the Module's own when the reader has none.
 func bookItems(m Model) []pickerItem {
 	books := m.books()
 	width := 0
 	for _, b := range books {
-		if w := lipgloss.Width(b.ShortName); w > width {
+		if w := lipgloss.Width(m.preferredAbbreviation(b)); w > width {
 			width = w
 		}
 	}
 	items := make([]pickerItem, 0, len(books))
 	for _, b := range books {
+		abbreviation := m.preferredAbbreviation(b)
+		shown := b
+		shown.ShortName = abbreviation
+		search := strings.Join(b.Names(), " ")
+		if abbreviation != "" {
+			search += " " + abbreviation
+		}
 		items = append(items, pickerItem{
-			label:  bookLabel(b, width),
-			search: strings.Join(b.Names(), " "),
+			label:  bookLabel(shown, width),
+			search: search,
 			value:  b.Number,
 			head:   b.DisplayName(),
-			short:  b.ShortName,
+			short:  abbreviation,
 			style:  m.styles.book(b.Number),
 		})
 	}
@@ -100,10 +109,10 @@ func bookItems(m Model) []pickerItem {
 // middle dot, dark grey, so the two names of the same Book read as a pair.
 const bookSeparator = " · "
 
-// bookLabel is the row a Book shows in a list: the Module's own abbreviation
-// padded so every name starts at the same column, the separator, and the
-// Module's own name — "Gn   · Génesis". A Module that names the Book only in
-// full shows the name alone.
+// bookLabel is the row a Book shows in a list: the abbreviation the reader
+// shows for it, padded so every name starts at the same column, the separator,
+// and the Module's own name — "Gn   · Génesis". A Module that names the Book
+// only in full shows the name alone.
 func bookLabel(b module.Book, width int) string {
 	name := b.DisplayName()
 	if b.ShortName == "" {
@@ -125,6 +134,21 @@ func bookParts(item pickerItem, line string) (abbrev, name string, ok bool) {
 	return "", "", false
 }
 
+// translationItems are the discovered Translations as modal rows: the Select
+// Translation modal and the first-run Preferred abbreviation prompt both list
+// them.
+func translationItems(m Model) []pickerItem {
+	items := make([]pickerItem, 0, len(m.translations))
+	for i, t := range m.translations {
+		items = append(items, pickerItem{
+			label:  pad(t.Abbreviation, 8) + t.Title,
+			search: t.Abbreviation + " " + t.Title,
+			value:  i,
+		})
+	}
+	return items
+}
+
 // pickers holds one entry per pickerKind, indexed by the kind. pickerNone is the
 // zero entry and is never shown.
 var pickers = [...]pickerSpec{
@@ -132,17 +156,7 @@ var pickers = [...]pickerSpec{
 	pickerTranslation: {
 		title:  selectTranslation,
 		filter: true,
-		items: func(m Model) []pickerItem {
-			items := make([]pickerItem, 0, len(m.translations))
-			for i, t := range m.translations {
-				items = append(items, pickerItem{
-					label:  pad(t.Abbreviation, 8) + t.Title,
-					search: t.Abbreviation + " " + t.Title,
-					value:  i,
-				})
-			}
-			return items
-		},
+		items:  translationItems,
 		confirm: func(m Model, value int) Model {
 			if value >= 0 && value < len(m.translations) {
 				reference, had := m.currentReference()
@@ -157,6 +171,20 @@ var pickers = [...]pickerSpec{
 			}
 			return m
 		},
+	},
+	pickerPreferredAbbreviations: {
+		title:  selectAbbreviationSource,
+		filter: true,
+		items:  translationItems,
+		cursor: func(m Model) int {
+			for i, t := range m.translations {
+				if t.Abbreviation == m.active {
+					return i
+				}
+			}
+			return 0
+		},
+		confirm: func(m Model, value int) Model { return m.seedPreferredAbbreviations(value) },
 	},
 	pickerCommentary: {
 		title:  selectCommentary,
@@ -511,14 +539,17 @@ func (m Model) parseReferenceInput() (module.Reference, bool) {
 	return module.ParseReference(text)
 }
 
-// namedBook is the one Book of the Active translation whose name is text, the
-// canonical name or the Module's own. A name no Book has, or one that more than
-// one Book claims, names nothing.
+// namedBook is the one Book of the Active translation whose name is text: the
+// canonical name, the Module's own short or long name, or the reader's
+// Preferred abbreviation. A name no Book has, or one that more than one Book
+// claims, names nothing.
 func (m Model) namedBook(text string) (module.Book, bool) {
 	var named module.Book
 	found := 0
 	for _, b := range m.books() {
-		if b.Named(text) {
+		shown := b
+		shown.ShortName = m.preferredAbbreviation(b)
+		if b.Named(text) || shown.Named(text) {
 			named, found = b, found+1
 		}
 	}

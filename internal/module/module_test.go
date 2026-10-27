@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -135,5 +136,37 @@ func TestDiscoverLeavesModuleFilesByteIdentical(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Errorf("the Module directory gained files after a read: %v", entries)
+	}
+}
+
+func TestBooksReadsTheBookRowsWithoutLoadingTheVerses(t *testing.T) {
+	dir := t.TempDir()
+	modtest.BibleAll(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera"},
+		[]modtest.Book{
+			{Number: 20, ShortName: "Ex", LongName: "Exodus", Present: true},
+			{Number: 10, ShortName: "Gen", LongName: "Genesis", Present: true},
+			{Number: 220, ShortName: "Job", LongName: "Job", Present: false},
+			{Number: 790, ShortName: "Man", LongName: "Manasseh", Present: true}, // legacy number
+		}, nil)
+
+	translations, warnings := Discover(dir)
+	if len(warnings) != 0 {
+		t.Fatalf("Discover warned: %v", warnings)
+	}
+	if len(translations) != 1 {
+		t.Fatalf("Discover found %d Translations, want 1", len(translations))
+	}
+
+	books, err := translations[0].Books()
+	if err != nil {
+		t.Fatalf("Books: %v", err)
+	}
+	want := []Book{
+		{Number: 10, Name: "Genesis", ShortName: "Gen", LongName: "Genesis"},
+		{Number: 20, Name: "Exodus", ShortName: "Ex", LongName: "Exodus"},
+		{Number: 145, Name: "Prayer of Manasseh", ShortName: "Man", LongName: "Manasseh"},
+	}
+	if !reflect.DeepEqual(books, want) {
+		t.Errorf("Books = %+v, want %+v", books, want)
 	}
 }
