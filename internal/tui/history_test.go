@@ -201,7 +201,7 @@ func TestHistorySurvivesARestart(t *testing.T) {
 	}
 
 	m := newReader(t, configDir, dir)
-	m = goTo(t, m, "Exodus 2:1")
+	goTo(t, m, "Exodus 2:1")
 
 	reopened := newReader(t, configDir, dir)
 	reopened, _ = send(t, reopened, press('H', "H", 0))
