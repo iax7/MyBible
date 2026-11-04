@@ -574,16 +574,25 @@ func (m Model) barView() string {
 	// The Reference fills its Book's color like a selected tab, so it skips the
 	// label style the other entries carry.
 	parts = append(parts, m.styles.key.Render(keyReference)+" "+m.referenceLabel())
+	if len(barCommands) > 0 {
+		parts = append(parts, m.styles.hint.Render("│"))
+	}
 	for _, c := range barCommands {
 		parts = append(parts, m.barEntry(c.Key, m.translate(c.Label)))
 	}
 	if len(m.warnings) > 0 {
 		parts = append(parts, m.logEntry())
 	}
-	lines := wrapParts(parts, m.width)
+	// One cell of padding on each side keeps the entries off the terminal edge;
+	// the bar's fill still reaches both edges.
+	inner, pad := m.width, ""
+	if m.width > 2 {
+		inner, pad = m.width-2, " "
+	}
+	lines := wrapParts(parts, inner)
 
 	for i, line := range lines {
-		lines[i] = m.styles.bar.Width(m.width).MaxWidth(m.width).Render(line)
+		lines[i] = m.styles.bar.Width(m.width).MaxWidth(m.width).Render(pad + line)
 	}
 	return strings.Join(lines, "\n")
 }
