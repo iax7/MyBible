@@ -6,7 +6,16 @@ MyBible stores each translation as a `.SQLite3` file. This reader opens those fi
 read-only — no import, no second copy, no new library to maintain.
 
 **Status: 0.1.0, pre-release.** The module format handling and the interface are still
-settling, so there are no published binaries yet.
+settling, so the installers below start working with the first tagged release.
+
+## Install
+
+```sh
+mise use -g github:iax7/MyBible        # mise, downloads the release binary
+```
+
+Releases are cut by pushing a `v<version>` tag: CI builds linux on amd64 and
+arm64 and attaches the archives.
 
 ## Build and run
 

@@ -12,7 +12,8 @@ import (
 )
 
 // version stays below 1.0 until the module format handling and the UX settle.
-const version = "0.1.0"
+// It is a var so release builds can stamp it with -X main.version.
+var version = "0.2.0"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
