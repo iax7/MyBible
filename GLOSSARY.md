@@ -74,7 +74,7 @@ A note a Translation attaches to a word or phrase of a Verse: a translation vari
 _Avoid_: Commentary, annotation, comment
 
 **Footnote marker**:
-The text a Translation writes inside `<f>…</f>` — `[1]`, `[1†]`, `ⓐ` — shown in the reading pane in the link style where the word it belongs to stands.
+The text a Translation writes inside `<f>…</f>` — `[1]`, `[1†]`, `ⓐ` — shown in the reading pane in the link style where the word it belongs to stands; `n` opens the note behind it.
 _Avoid_: Superscript, symbol, callout
 
 **Footnotes module**:

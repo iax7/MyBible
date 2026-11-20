@@ -99,6 +99,7 @@ func TestTheHelpModalReadsInBothLanguages(t *testing.T) {
 		{"Translation", "Traducción"},
 		{"Commentary", "Comentario"},
 		{"Open commentary", "Abrir comentario"},
+		{"Footnotes", "Notas al pie"},
 		{"Cross-reference modules", "Módulos de referencias"},
 		{"References", "Referencias"},
 		{"Toggle top bar", "Mostrar u ocultar la barra"},

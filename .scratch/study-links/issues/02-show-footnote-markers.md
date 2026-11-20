@@ -22,5 +22,6 @@ without the `marker` column are read as before, with no marker.
 - [x] Empty and unclosed markers do not leak text into the Verse.
 - [x] Search and snippets read the Verse without its markers.
 - [x] A Footnotes module shows each note behind its marker, in the link style.
+- [x] `n` opens the Footnote module's tab, preferring the Translation's own; `Enter` opens it when nothing else speaks to the Verse.
 - [x] Commentary Modules without a `marker` column still load.
 - [x] Module and TUI tests cover the parser, the spacing flag, search and the note prefix.

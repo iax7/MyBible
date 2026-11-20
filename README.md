@@ -51,6 +51,7 @@ go build ./cmd/mybible
 | `m` | Commentary |
 | `X` | Cross-reference modules |
 | `Enter` | Open commentary |
+| `n` | Footnotes |
 | `x` | References |
 | `/` | Search |
 | `H` | History |
@@ -72,6 +73,34 @@ Drop your `.SQLite3` files there and the reader finds them at startup. To read t
 from somewhere else, set `module_directory` in the config file. Module files are
 opened read-only and are never modified or copied. Module content is mixed-license
 and mostly not redistributable, so no module file belongs in this repository.
+
+### Getting modules
+
+The reader downloads nothing: modules are downloaded by the MyBible app on Android
+and then copied over. In the app, download the module you want — a Bible, and any
+commentary or subheadings companion. It is saved in the app's data directory:
+
+```
+/storage/emulated/0/Android/data/ua.mybible/files/MyBible/
+```
+
+or in `/storage/emulated/0/MyBible/` when the app can write to shared storage, or
+wherever **Settings → Data directory** points.
+
+Plug the phone in, then copy every `.SQLite3` file in that folder (a module can
+bring companions such as `RV60-s.subheadings.SQLite3` next to `RV60.SQLite3`):
+
+```sh
+mkdir -p ~/.local/share/mybible
+cp /run/media/$USER/<phone>/Android/data/ua.mybible/files/MyBible/*.SQLite3 ~/.local/share/mybible/
+```
+
+Android 11+ hides `Android/data` from USB/MTP on many phones. If the folder does
+not show up, point the app's data directory somewhere visible, or pull it with `adb`:
+
+```sh
+adb pull /sdcard/Android/data/ua.mybible/files/MyBible ~/.local/share/mybible
+```
 
 By default, Book names come from the Module, not from the reader: a Spanish
 Translation lists `Gn · Génesis` and completes `Génesis`. The built-in English
@@ -101,9 +130,11 @@ Bible it was written for. The one you pick labels the verses it covers and opens
 in its own modal on `Enter`, with `Tab` to switch between modules.
 
 Footnotes are shown where the module writes them: the marker the text carries
-(`[1]`, `[1†]`, `ⓐ`) is drawn in the link style, and `Enter` opens the note in
-the Commentary modal, where a module that declares itself Footnotes puts each
-note behind its marker.
+(`[1]`, `[1†]`, `ⓐ`) is drawn in the link style, and `n` opens the note — the
+Commentary modal's Footnotes tab, chosen for the translation you are reading.
+`Enter` opens the same modal on the commentary, and `Tab` switches between the
+modules, where a module that declares itself Footnotes puts each note behind its
+marker.
 
 Cross-references come from `.crossreferences.SQLite3` modules. `X` lists them and
 `Space` turns each on or off; every Verse the chosen sets speak to ends with

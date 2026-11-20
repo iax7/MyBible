@@ -97,26 +97,6 @@ func (m Model) commentaryLabels() map[int]bool {
 	return labels
 }
 
-// activeCommentaryCovers reports whether the Active commentary has something to
-// say about one Verse of the current Chapter.
-func (m Model) activeCommentaryCovers(verse int) bool {
-	if m.activeCommentary == "" || !m.commentaryFresh() {
-		return false
-	}
-	for _, row := range m.commentary.rows {
-		if row.ChapterLevel() {
-			if verse == 1 && row.ChapterFrom == m.chapter {
-				return true
-			}
-			continue
-		}
-		if row.Covers(m.chapter, verse) {
-			return true
-		}
-	}
-	return false
-}
-
 // appendCommentaryLabel writes the Active commentary's label at the end of a
 // Verse's last line, or on an indented line of its own when it does not fit.
 func (m Model) appendCommentaryLabel(lines []string, indent int) []string {
@@ -132,31 +112,79 @@ func (m Model) appendCommentaryLabel(lines []string, indent int) []string {
 	return append(lines, strings.Repeat(" ", indent)+label)
 }
 
-// openCommentary opens the Commentary modal for the cursor's Verse, when the
-// Active commentary speaks to it.
+// openCommentary opens the Commentary modal for the cursor's Verse, when any
+// installed Commentary module speaks to it, the Active commentary first.
 func (m Model) openCommentary() Model {
 	reference, ok := m.currentReference()
-	if !ok || !m.activeCommentaryCovers(reference.Verse) {
+	if !ok {
 		return m
 	}
-	return m.openCommentaryAt(reference)
+	return m.openStudyAt(reference, func(tabs []commentaryTab) int {
+		for i, tab := range tabs {
+			if tab.abbreviation == m.activeCommentary {
+				return i
+			}
+		}
+		return 0
+	})
 }
 
-// openCommentaryAt builds the modal for a Reference, reading every Commentary
-// module on demand and keeping only the rows that speak to that Verse.
-func (m Model) openCommentaryAt(reference module.Reference) Model {
+// openFootnotes opens the same modal at the Footnotes module that answers the
+// Verse's markers, preferring the one named after the Active translation. A
+// Verse no Footnotes module speaks to opens nothing.
+func (m Model) openFootnotes() Model {
+	reference, ok := m.currentReference()
+	if !ok {
+		return m
+	}
+	return m.openStudyAt(reference, func(tabs []commentaryTab) int {
+		for i, tab := range tabs {
+			if tab.footnotes && tab.abbreviation == m.active {
+				return i
+			}
+		}
+		for i, tab := range tabs {
+			if tab.footnotes {
+				return i
+			}
+		}
+		return -1
+	})
+}
+
+// reopenCommentary rebuilds the open modal for a new screen size, keeping the
+// tab the reader was on.
+func (m Model) reopenCommentary() Model {
+	abbreviation := ""
+	if modal := m.commentaryModal; modal.cursor >= 0 && modal.cursor < len(modal.tabs) {
+		abbreviation = modal.tabs[modal.cursor].abbreviation
+	}
+	return m.openStudyAt(m.commentaryModal.reference, func(tabs []commentaryTab) int {
+		for i, tab := range tabs {
+			if tab.abbreviation == abbreviation {
+				return i
+			}
+		}
+		return 0
+	})
+}
+
+// openStudyAt builds the modal for a Reference and lets choose pick the tab. A
+// chooser that returns -1 leaves the modal closed: the reader asked for a kind
+// of study the Verse has none of.
+func (m Model) openStudyAt(reference module.Reference, choose func([]commentaryTab) int) Model {
 	tabs, warnings := m.commentaryTabs(reference)
 	m.warnings = append(m.warnings, warnings...)
 	if len(tabs) == 0 {
 		m.commentaryModal = commentaryModal{}
 		return m
 	}
-	cursor := 0
-	for i, tab := range tabs {
-		if tab.abbreviation == m.activeCommentary {
-			cursor = i
-			break
-		}
+	cursor := choose(tabs)
+	if cursor < 0 {
+		return m
+	}
+	if cursor >= len(tabs) {
+		cursor = 0
 	}
 	m.commentaryModal = commentaryModal{open: true, reference: reference, tabs: tabs, cursor: cursor}
 	return m

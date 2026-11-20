@@ -24,7 +24,8 @@ Read `<f>…</f>` as a Footnote marker Run in the link style, and discover the
 Cross-reference sets. The reader turns sets on under `X`; the reading pane ends
 every Verse they speak to with `[⇅N]`; `x` opens the References popup with each
 reference and the passage it points to. The notes a Footnotes module carries show
-behind their marker in the Commentary modal.
+behind their marker in the Commentary modal, and `n` opens that modal at the
+Footnotes module of the translation being read.
 
 ## User Stories
 

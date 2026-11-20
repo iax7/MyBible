@@ -221,3 +221,88 @@ func TestTheCommentaryPickerChangesTheActiveCommentary(t *testing.T) {
 		t.Errorf("the reading pane still shows the old commentary label\n%s", got)
 	}
 }
+
+// footnotesReader builds a Bible whose first two Verses carry Footnote markers,
+// with a study Bible as the Active commentary and the Translation's own
+// Footnotes module beside it.
+func footnotesReader(t *testing.T) Model {
+	t.Helper()
+
+	dir := t.TempDir()
+	modtest.BibleAll(t, dir, "RST.SQLite3",
+		map[string]string{"description": "Reina-Valera 1909", "add_space_before_footnote_marker": "true"},
+		genesis(),
+		[]modtest.Verse{
+			{Book: 10, Chapter: 1, Verse: 1, Text: "verse01<f>[1]</f>"},
+			{Book: 10, Chapter: 1, Verse: 2, Text: "verse02<f>[2]</f>"},
+			{Book: 10, Chapter: 1, Verse: 3, Text: "verse03"},
+		})
+	modtest.Commentaries(t, dir, "MAC.commentaries.SQLite3",
+		map[string]string{"description": "MacArthur Study Bible"},
+		[]modtest.Commentary{{Book: 10, ChapterFrom: 1, VerseFrom: 1, Text: "Mac comment"}})
+	modtest.Commentaries(t, dir, "RST.commentaries.SQLite3",
+		map[string]string{"description": "Notas", "is_footnotes": "true"},
+		[]modtest.Commentary{
+			{Book: 10, ChapterFrom: 1, VerseFrom: 1, Marker: "[1]", Text: "note one"},
+			{Book: 10, ChapterFrom: 1, VerseFrom: 2, Marker: "[2]", Text: "note two"},
+		})
+	return configured(t, config.Config{ModuleDir: dir, ActiveTranslation: "RST", ActiveCommentary: "MAC"})
+}
+
+func TestNOPensTheNoteBehindTheMarker(t *testing.T) {
+	m := footnotesReader(t)
+	if got := render(t, m); !strings.Contains(got, "verse01 [1]") {
+		t.Fatalf("the Footnote marker is not shown\n%s", got)
+	}
+
+	m, _ = send(t, m, press('n', "n", 0))
+	got := modalText(t, m)
+	for _, want := range []string{"MAC", "RST", "[1] note one"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the Footnotes tab is missing %q\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Mac comment") {
+		t.Errorf("n did not land on the Footnotes tab\n%s", got)
+	}
+}
+
+func TestNFollowsTheCursorToItsNote(t *testing.T) {
+	m := footnotesReader(t)
+	m, _ = send(t, m, press('j', "j", 0))
+	m, _ = send(t, m, press('n', "n", 0))
+
+	if got := modalText(t, m); !strings.Contains(got, "[2] note two") {
+		t.Errorf("n did not open the note of the cursor's Verse\n%s", got)
+	}
+}
+
+func TestEnterOpensAFootnoteWhenTheActiveCommentaryIsSilent(t *testing.T) {
+	m := footnotesReader(t)
+	m, _ = send(t, m, press('j', "j", 0)) // verse 2: the study Bible says nothing
+	m, _ = send(t, m, press(tea.KeyEnter, "", 0))
+
+	if got := modalText(t, m); !strings.Contains(got, "note two") {
+		t.Errorf("Enter did not open the only study material the Verse has\n%s", got)
+	}
+}
+
+func TestNWithoutFootnotesOpensNothing(t *testing.T) {
+	m := footnotesReader(t)
+	m, _ = send(t, m, press('G', "G", 0)) // verse 3: no marker, no note
+	m, _ = send(t, m, press('n', "n", 0))
+
+	if got := modalText(t, m); got != "" {
+		t.Errorf("n opened a modal for a Verse with no Footnotes\n%s", got)
+	}
+}
+
+func TestResizingKeepsTheSelectedTab(t *testing.T) {
+	m := footnotesReader(t)
+	m, _ = send(t, m, press('n', "n", 0))
+	m, _ = send(t, m, tea.WindowSizeMsg{Width: 90, Height: 26})
+
+	if got := modalText(t, m); !strings.Contains(got, "note one") {
+		t.Errorf("resizing moved the modal off the Footnotes tab\n%s", got)
+	}
+}

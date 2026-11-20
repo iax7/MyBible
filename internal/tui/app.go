@@ -29,6 +29,7 @@ var Commands = []Command{
 	{"m", "Commentary"},
 	{keySelectCrossReferences, "Cross-reference modules"},
 	{keyEnter, "Open commentary"},
+	{keyFootnotes, "Footnotes"},
 	{keyCrossReferences, "References"},
 	{"/", "Search"},
 	{"H", "History"},
@@ -71,6 +72,7 @@ const (
 	keyReference             = "v"
 	keyTranslation           = "t"
 	keyCommentary            = "m"
+	keyFootnotes             = "n"
 	keyCrossReferences       = "x"
 	keySelectCrossReferences = "X"
 	keySearch                = "/"
@@ -335,7 +337,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		if m.commentaryModal.open {
-			m = m.openCommentaryAt(m.commentaryModal.reference)
+			m = m.reopenCommentary()
 		}
 		if m.crossReferencesModal.open {
 			m = m.openCrossReferencesAt(m.crossReferencesModal.reference)
@@ -391,6 +393,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openCrossReferencesPicker()
 		case keyEnter:
 			m = m.openCommentary()
+		case keyFootnotes:
+			m = m.openFootnotes()
 		case keySearch:
 			m = m.openPicker(pickerSearch)
 		case keyHistory:

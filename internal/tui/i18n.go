@@ -25,6 +25,7 @@ var spanish = map[string]string{
 	"Commentary":              "Comentario",
 	"Cross-reference modules": "Módulos de referencias",
 	"Open commentary":         "Abrir comentario",
+	"Footnotes":               "Notas al pie",
 	"References":              "Referencias",
 	"Search":                  "Buscar",
 	"History":                 "Historial",
