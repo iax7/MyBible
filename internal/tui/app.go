@@ -290,14 +290,14 @@ func (m Model) loadActive() Model {
 func (m Model) StartupError() error {
 	switch {
 	case m.moduleDir == "":
-		return fmt.Errorf("%s %s %s",
+		return fmt.Errorf("%s\n%s %s",
 			m.translate("No Module directory configured."),
 			fmt.Sprintf(m.translate("Set module_directory in %s"), config.Path(m.configDir)),
 			m.translate("to the folder holding your MyBible *.SQLite3 modules."))
 	case len(m.translations) == 0:
-		return fmt.Errorf("%s %s",
+		return fmt.Errorf("%s\n%s",
 			fmt.Sprintf(m.translate("No Bible Modules found in %s."), m.moduleDir),
-			m.translate("Put your *.SQLite3 modules there, then restart the reader."))
+			m.translate("Put your *.SQLite3 modules there."))
 	}
 	return nil
 }
@@ -536,7 +536,7 @@ func (m Model) paneContent(height int) string {
 		b.WriteString(m.translate("to the folder holding your MyBible *.SQLite3 modules."))
 	case len(m.translations) == 0:
 		b.WriteString(fmt.Sprintf(m.translate("No Bible Modules found in %s."), m.moduleDir) + "\n\n")
-		b.WriteString(m.translate("Put your *.SQLite3 modules there, then restart the reader."))
+		b.WriteString(m.translate("Put your *.SQLite3 modules there."))
 	case m.active == "":
 		b.WriteString(m.translate("No Active translation.") + "\n\n")
 		fmt.Fprintf(&b, m.translate("Press %s to choose one."), keyTranslation)

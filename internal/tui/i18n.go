@@ -76,13 +76,13 @@ var spanish = map[string]string{
 	"Chapter %d": "Capítulo %d",
 
 	// Empty states and warnings.
-	"No Module directory configured.":                            "No hay un directorio de módulos configurado.",
-	"Set module_directory in %s":                                 "Define module_directory en %s",
-	"to the folder holding your MyBible *.SQLite3 modules.":      "en la carpeta que contiene tus módulos MyBible *.SQLite3.",
-	"No Bible Modules found in %s.":                              "No se encontraron módulos de la Biblia en %s.",
-	"Put your *.SQLite3 modules there, then restart the reader.": "Coloca allí tus módulos *.SQLite3 y reinicia el lector.",
-	"No Active translation.":                                     "No hay una traducción activa.",
-	"Press %s to choose one.":                                    "Pulsa %s para elegir una.",
+	"No Module directory configured.":                       "No hay un directorio de módulos configurado.",
+	"Set module_directory in %s":                            "Define module_directory en %s",
+	"to the folder holding your MyBible *.SQLite3 modules.": "en la carpeta que contiene tus módulos MyBible *.SQLite3.",
+	"No Bible Modules found in %s.":                         "No se encontraron módulos de la Biblia en %s.",
+	"Put your *.SQLite3 modules there.":                     "Coloca allí tus módulos *.SQLite3.",
+	"No Active translation.":                                "No hay una traducción activa.",
+	"Press %s to choose one.":                               "Pulsa %s para elegir una.",
 }
 
 // resolveLanguage picks the interface language: the config value first, then
