@@ -76,31 +76,33 @@ and mostly not redistributable, so no module file belongs in this repository.
 
 ### Getting modules
 
-The reader downloads nothing: modules are downloaded by the MyBible app on Android
-and then copied over. In the app, download the module you want — a Bible, and any
-commentary or subheadings companion. It is saved in the app's data directory:
-
-```
-/storage/emulated/0/Android/data/ua.mybible/files/MyBible/
-```
-
-or in `/storage/emulated/0/MyBible/` when the app can write to shared storage, or
-wherever **Settings → Data directory** points.
-
-Plug the phone in, then copy every `.SQLite3` file in that folder (a module can
-bring companions such as `RV60-s.subheadings.SQLite3` next to `RV60.SQLite3`):
+The reader downloads nothing: modules are downloaded by the MyBible app on Android.
+With the phone connected in file transfer (MTP) mode, this copies everything from
+the app's data folder into the Module directory:
 
 ```sh
-mkdir -p ~/.local/share/mybible
-cp /run/media/$USER/<phone>/Android/data/ua.mybible/files/MyBible/*.SQLite3 ~/.local/share/mybible/
+mybible copy-modules
 ```
 
-Android 11+ hides `Android/data` from USB/MTP on many phones. If the folder does
-not show up, point the app's data directory somewhere visible, or pull it with `adb`:
+Modules are copied as they are, and the app's `user` folder (bookmarks, notes,
+themes, abbreviations) comes along as a backup. The app's caches, search indexes
+and journals are left out. Files already in the destination are overwritten and
+nothing is ever deleted from it. The command respects `module_directory` from the
+config.
 
-```sh
-adb pull /sdcard/Android/data/ua.mybible/files/MyBible ~/.local/share/mybible
-```
+It reaches the phone over MTP with KDE's `kioclient`, the same stack Dolphin uses.
+The app keeps its data in
+`/storage/emulated/0/Android/data/ua.mybible/files/MyBible/` or in
+`/storage/emulated/0/MyBible/`; the command looks in both, and also under any SD
+card the phone mounts.
+
+To copy by hand, the files are in that folder: copy the `.SQLite3` modules, plus
+any companion that came with one (`RV60-s.subheadings.SQLite3` next to
+`RV60.SQLite3`). Android 11+ hides `Android/data` from USB/MTP on some phones; if
+yours does, move the app's data directory or pull the folder with `adb`.
+
+Copying an abbreviation set is only a backup: the reader reads its Preferred set
+from `~/.config/mybible/preferred.abbreviations.json`, described below.
 
 By default, Book names come from the Module, not from the reader: a Spanish
 Translation lists `Gn · Génesis` and completes `Génesis`. The built-in English

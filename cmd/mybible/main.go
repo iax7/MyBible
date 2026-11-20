@@ -17,11 +17,26 @@ var version = "0.3.0"
 
 func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
+	flag.Usage = usage
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Println("mybible " + version)
 		return
+	}
+
+	switch flag.Arg(0) {
+	case "":
+	case "copy-modules":
+		if err := copyModules(); err != nil {
+			fmt.Fprintln(os.Stderr, "mybible:", err)
+			os.Exit(1)
+		}
+		return
+	default:
+		fmt.Fprintf(os.Stderr, "mybible: unknown command %q\n", flag.Arg(0))
+		flag.Usage()
+		os.Exit(2)
 	}
 
 	m := tui.New(tui.Options{})
