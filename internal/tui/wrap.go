@@ -107,7 +107,7 @@ func appendRun(runs []module.Run, run module.Run) []module.Run {
 		return runs
 	}
 	if n := len(runs); n > 0 && runs[n-1].Italics == run.Italics && runs[n-1].Red == run.Red &&
-		runs[n-1].Bold == run.Bold && runs[n-1].Link == run.Link {
+		runs[n-1].Bold == run.Bold && runs[n-1].Link == run.Link && runs[n-1].Marker == run.Marker {
 		runs[n-1].Text += run.Text
 		return runs
 	}
@@ -125,5 +125,5 @@ func runWidth(runs []module.Run) int {
 
 // withText is a Run's style carried onto a slice of its text.
 func withText(run module.Run, text string) module.Run {
-	return module.Run{Text: text, Italics: run.Italics, Red: run.Red, Bold: run.Bold, Link: run.Link}
+	return module.Run{Text: text, Italics: run.Italics, Red: run.Red, Bold: run.Bold, Link: run.Link, Marker: run.Marker}
 }

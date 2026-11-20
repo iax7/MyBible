@@ -55,7 +55,7 @@ _Avoid_: Subtitle, section title, heading
 
 **Commentary**:
 What a Commentary module says about a Verse, a range of Verses, or a whole Chapter.
-_Avoid_: Note, footnote, annotation
+_Avoid_: Note, annotation, comment
 
 **Commentary module**:
 A Module of type commentaries: one edition's Commentary, read beside the Active translation and chosen by the reader rather than paired by file name.
@@ -67,11 +67,43 @@ _Avoid_: Selected commentary, current commentary
 
 **Commentary label**:
 The Active commentary's abbreviation, shown at the end of every Verse it covers.
-_Avoid_: Marker, badge, tag
+_Avoid_: Badge, tag
+
+**Footnote**:
+A note a Translation attaches to a word or phrase of a Verse: a translation variant, a clarification, a literal rendering.
+_Avoid_: Commentary, annotation, comment
+
+**Footnote marker**:
+The text a Translation writes inside `<f>…</f>` — `[1]`, `[1†]`, `ⓐ` — shown in the reading pane in the link style where the word it belongs to stands.
+_Avoid_: Superscript, symbol, callout
+
+**Footnotes module**:
+A Commentary module that declares itself Footnotes, whose rows answer the Footnote markers a Translation carries. One module holds the Footnotes of the Translation it is named after.
+_Avoid_: Notes module, footnote translation
+
+**Cross-reference**:
+A link from a Verse or a range of Verses to another passage, carrying the votes of the witnesses that attest it.
+_Avoid_: Citation, verse link
+
+**Cross-reference set**:
+A Module of type crossreferences: one edition's Cross-references for every Verse. The reader may read several sets at once.
+_Avoid_: Reference module, citation set
+
+**Active Cross-reference sets**:
+The sets the reader turned on. Their Cross-references are merged, a target that several sets share counts once (the most voted link wins), and the reading pane marks every Verse they speak to.
+_Avoid_: Selected sets, current sets
+
+**Cross-reference marker**:
+`[⇅N]` at the end of a Verse the Active Cross-reference sets speak to. N is the number of distinct targets, and the marker opens the References popup.
+_Avoid_: Badge, reference count
+
+**References popup**:
+The modal opened with `x`: the cursor Verse's Cross-references, each with the passage it points to, read without leaving the Chapter.
+_Avoid_: Cross-reference window, balloon
 
 **Verse link**:
 A Reference written inside Commentary text or under a Subheading, underlined and green so the reader can see it names a Verse.
-_Avoid_: Cross-reference, citation, hyperlink
+_Avoid_: Citation, hyperlink
 
 **Reference**:
 The address of a Verse or a range of Verses — book, chapter, verse — used to name a location in navigation history and search results.

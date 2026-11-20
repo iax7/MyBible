@@ -222,3 +222,25 @@ func TestParseCommentary(t *testing.T) {
 		})
 	}
 }
+
+// Commentary Modules older than the marker column are still read; they simply
+// carry no Footnote markers.
+func TestCommentaryRowsReadAModuleWithoutTheMarkerColumn(t *testing.T) {
+	dir := t.TempDir()
+	modtest.Create(t, dir, "OLD.commentaries.SQLite3",
+		`CREATE TABLE info (name TEXT, value TEXT)`,
+		`CREATE TABLE commentaries (book_number NUMERIC, chapter_number_from NUMERIC, verse_number_from NUMERIC, chapter_number_to NUMERIC, verse_number_to NUMERIC, text TEXT)`,
+		`INSERT INTO commentaries VALUES (10, 1, 2, 0, 0, 'old note')`)
+
+	sets, warnings := DiscoverCommentaries(dir)
+	if len(warnings) != 0 || len(sets) != 1 {
+		t.Fatalf("DiscoverCommentaries = %v, %v", sets, warnings)
+	}
+	rows, err := sets[0].Rows(10, 1)
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Text != "old note" || rows[0].Marker != "" {
+		t.Errorf("Rows = %+v, want the note and no marker", rows)
+	}
+}

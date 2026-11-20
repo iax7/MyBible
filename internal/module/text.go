@@ -15,6 +15,11 @@ type Text struct {
 	books    []bookText
 	index    map[int]int                  // Book number -> position in books, so lookup is not a walk
 	headings map[int]map[int][]Subheading // Book number -> Chapter -> Subheadings, from the Translation or its companion
+
+	// footnoteSpace is the info.add_space_before_footnote_marker flag: the
+	// Translation writes its Footnotes tight against the word before them and
+	// asks the reader to space them.
+	footnoteSpace bool
 }
 
 // bookText is one Book of a loaded Translation, with its Chapters indexed by
@@ -120,6 +125,11 @@ func (t Translation) Load() (*Text, []string, error) {
 	}
 
 	var warnings []string
+	info, err := infoTable(db)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: cannot read the info table: %v", filepath.Base(t.path), err))
+	}
+	text.footnoteSpace = info["add_space_before_footnote_marker"] == "true"
 	// A Subheading's cross-reference is labeled with the name the Translation
 	// gives the Book it points at, so a Spanish Module reads "Éxodo 1:1".
 	bookName := func(number int) string {
@@ -171,6 +181,10 @@ func (t Translation) Books() ([]Book, error) {
 	sort.Slice(books, func(i, j int) bool { return books[i].Number < books[j].Number })
 	return books, nil
 }
+
+// AddsSpaceBeforeFootnoteMarker reports whether the Translation asks the reader
+// to space a Footnote marker from the word before it.
+func (t *Text) AddsSpaceBeforeFootnoteMarker() bool { return t.footnoteSpace }
 
 // Books returns the loaded Translation's Books in Canonical order.
 func (t *Text) Books() []Book {
@@ -344,26 +358,42 @@ func moduleBooks(db *sql.DB, tables map[string]bool) (map[int]Book, error) {
 // Run is a stretch of Verse or Commentary text sharing one display style. A
 // break tag becomes a Run whose Text is "\n" for <br/> or "\n\n" for <pb/>.
 // Bold marks Commentary text the Module emphasized; Link marks a verse link,
-// which the reader underlines so it can become clickable.
+// which the reader underlines so it can become clickable. Marker marks a
+// Footnote marker, which the reader draws like a link.
 type Run struct {
 	Text    string
 	Italics bool
 	Red     bool
 	Bold    bool
 	Link    bool
+	Marker  bool
 }
 
-// strippedTags enclose content that 0.0.2 hides: Strong's numbers, morphology,
-// footnotes, subheadings, and cross-reference markers.
-var strippedTags = map[string]bool{"s": true, "m": true, "f": true, "h": true, "x": true}
+// strippedTags enclose content the reader hides: Strong's numbers, morphology,
+// subheadings, and cross-reference markers. Footnotes are read apart, because
+// the reading pane shows their marker.
+var strippedTags = map[string]bool{"s": true, "m": true, "h": true, "x": true}
 
 // ParseMarkup turns a Verse's raw text into display Runs: <i> becomes italics,
 // <J> becomes the red words-of-Jesus style, <pb/> and <br/> become breaks. All
 // other tags are stripped, along with the content of <S>, <m>, <f>, <h>, and <x>.
-func ParseMarkup(text string) []Run {
+// Search reads Verses through it, so a Footnote marker stays out of the text
+// that is searched and shown as a snippet.
+func ParseMarkup(text string) []Run { return parseMarkup(text, false, false) }
+
+// ParseVerse turns a Verse's raw text into display Runs the way the reading pane
+// shows it: ParseMarkup, except that a <f>...</f> Footnote marker keeps its text
+// as a Marker Run. spaceBeforeMarker inserts the space a Translation asks for
+// between a marker and the word before it, when the Module writes none.
+func ParseVerse(text string, spaceBeforeMarker bool) []Run {
+	return parseMarkup(text, true, spaceBeforeMarker)
+}
+
+func parseMarkup(text string, footnotes, spaceBeforeMarker bool) []Run {
 	var runs []Run
 	var italics, red bool
 	hidden := "" // the stripped tag whose content is being skipped
+	marker := -1 // the Run holding the Footnote marker being read, or -1
 
 	for i := 0; i < len(text); {
 		if text[i] != '<' {
@@ -372,7 +402,11 @@ func ParseMarkup(text string) []Run {
 				end = len(text) - i
 			}
 			if hidden == "" {
-				runs = append(runs, Run{Text: text[i : i+end], Italics: italics, Red: red})
+				if marker >= 0 {
+					runs[marker].Text += text[i : i+end]
+				} else {
+					runs = append(runs, Run{Text: text[i : i+end], Italics: italics, Red: red})
+				}
 			}
 			i += end
 			continue
@@ -381,7 +415,11 @@ func ParseMarkup(text string) []Run {
 		end := strings.IndexByte(text[i:], '>')
 		if end < 0 { // an unmatched '<' is literal text
 			if hidden == "" {
-				runs = append(runs, Run{Text: text[i:], Italics: italics, Red: red})
+				if marker >= 0 {
+					runs[marker].Text += text[i:]
+				} else {
+					runs = append(runs, Run{Text: text[i:], Italics: italics, Red: red})
+				}
 			}
 			break
 		}
@@ -396,6 +434,17 @@ func ParseMarkup(text string) []Run {
 			}
 			continue
 		}
+		if marker >= 0 {
+			if closing && name == "f" {
+				if runs[marker].Text == "" {
+					runs = runs[:marker]
+				} else if spaceBeforeMarker && marker > 0 && !endsWithSpace(runs[marker-1].Text) {
+					runs[marker].Text = " " + runs[marker].Text
+				}
+				marker = -1
+			}
+			continue
+		}
 		switch {
 		case name == "pb":
 			runs = append(runs, Run{Text: "\n\n"})
@@ -405,9 +454,29 @@ func ParseMarkup(text string) []Run {
 			italics = !closing
 		case name == "j":
 			red = !closing
+		case name == "f" && !closing:
+			if !footnotes {
+				hidden = name
+				break
+			}
+			runs = append(runs, Run{Marker: true})
+			marker = len(runs) - 1
 		case strippedTags[name] && !closing:
 			hidden = name
 		}
 	}
+	if marker >= 0 { // an unclosed <f> hides what it swallowed, as ParseMarkup does
+		runs = runs[:marker]
+	}
 	return runs
+}
+
+// endsWithSpace reports whether text ends on whitespace, so a Footnote marker
+// written after a space is not given another.
+func endsWithSpace(text string) bool {
+	if text == "" {
+		return false
+	}
+	return strings.HasSuffix(text, " ") || strings.HasSuffix(text, "\t") ||
+		strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")
 }

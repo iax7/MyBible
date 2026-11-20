@@ -22,17 +22,26 @@ type Commentary struct {
 	Title        string // the human title, from info.description
 	Language     string // the two-letter language, from info.language
 	path         string
+	footnotes    bool // info.is_footnotes: the Module carries Footnote texts
+	markers      bool // the commentaries table has the marker column Footnotes are found by
 }
+
+// IsFootnotes reports whether the Commentary Module carries Footnote texts
+// rather than Commentary on the Verses. A Footnotes Module is named after the
+// Translation it belongs to, so the reader pairs them by abbreviation.
+func (c Commentary) IsFootnotes() bool { return c.footnotes }
 
 // CommentaryRow is one entry of a Commentary: the range of Verses it speaks to
 // and its text, with the Module's markup still in it. A zero ChapterTo or
 // VerseTo means the Module wrote no end; a zero VerseFrom means the entry is a
-// summary of the whole Chapter.
+// summary of the whole Chapter. Marker is the Footnote marker the entry answers
+// to, empty in a Module that carries no markers.
 type CommentaryRow struct {
 	ChapterFrom int
 	VerseFrom   int
 	ChapterTo   int
 	VerseTo     int
+	Marker      string
 	Text        string
 }
 
@@ -131,6 +140,8 @@ func readCommentary(path string) (Commentary, error) {
 		Title:        info["description"],
 		Language:     info["language"],
 		path:         path,
+		footnotes:    info["is_footnotes"] == "true",
+		markers:      tableHasColumn(db, tableCommentaries, "marker"),
 	}, nil
 }
 
@@ -155,8 +166,12 @@ func (c Commentary) Rows(book, chapter int) ([]CommentaryRow, error) {
 	}
 	args = append(args, chapter, chapter)
 
+	marker := "''"
+	if c.markers {
+		marker = "COALESCE(marker, '')"
+	}
 	rows, err := db.Query(`SELECT chapter_number_from, verse_number_from,
-			COALESCE(chapter_number_to, 0), COALESCE(verse_number_to, 0), text
+			COALESCE(chapter_number_to, 0), COALESCE(verse_number_to, 0), `+marker+`, text
 		FROM commentaries
 		WHERE book_number IN (`+strings.Join(placeholders, ",")+`)
 			AND chapter_number_from >= 1 AND chapter_number_from <= ?
@@ -172,7 +187,7 @@ func (c Commentary) Rows(book, chapter int) ([]CommentaryRow, error) {
 	for rows.Next() {
 		var row CommentaryRow
 		var text sql.NullString
-		if err := rows.Scan(&row.ChapterFrom, &row.VerseFrom, &row.ChapterTo, &row.VerseTo, &text); err != nil {
+		if err := rows.Scan(&row.ChapterFrom, &row.VerseFrom, &row.ChapterTo, &row.VerseTo, &row.Marker, &text); err != nil {
 			return nil, err
 		}
 		if row.ChapterTo < 1 && row.ChapterFrom != chapter {
@@ -182,6 +197,29 @@ func (c Commentary) Rows(book, chapter int) ([]CommentaryRow, error) {
 		commentary = append(commentary, row)
 	}
 	return commentary, rows.Err()
+}
+
+// tableHasColumn reports whether table has a column. Older Commentary Modules
+// predate the marker column Footnotes are found by.
+func tableHasColumn(db *sql.DB, table, column string) bool {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var position, notNull, primaryKey int
+		var name, kind string
+		var fallback sql.NullString
+		if err := rows.Scan(&position, &name, &kind, &notNull, &fallback, &primaryKey); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 // bookNumbers is the Module book numbers that name one Canonical Book: its own,

@@ -151,6 +151,7 @@ type Commentary struct {
 	VerseFrom   int
 	ChapterTo   int
 	VerseTo     int
+	Marker      string // the Footnote marker; empty writes the row's own number
 	Text        string
 	NullEnd     bool // write the end as NULL, the way some Modules do
 }
@@ -170,8 +171,43 @@ func Commentaries(t testing.TB, dir, filename string, info map[string]string, ro
 		if row.NullEnd {
 			end = "NULL, NULL"
 		}
+		marker := row.Marker
+		if marker == "" {
+			marker = itoa(i) // distinct, so several rows can share a Verse
+		}
 		statements = append(statements, "INSERT INTO commentaries (book_number, chapter_number_from, verse_number_from, chapter_number_to, verse_number_to, marker, text) VALUES ("+
-			itoa(row.Book)+", "+itoa(row.ChapterFrom)+", "+itoa(row.VerseFrom)+", "+end+", "+quote(itoa(i))+", "+quote(row.Text)+")")
+			itoa(row.Book)+", "+itoa(row.ChapterFrom)+", "+itoa(row.VerseFrom)+", "+end+", "+quote(marker)+", "+quote(row.Text)+")")
+	}
+	return Create(t, dir, filename, statements...)
+}
+
+// CrossReference is one row of a synthetic Cross-reference set.
+type CrossReference struct {
+	Book       int
+	Chapter    int
+	Verse      int
+	VerseEnd   int
+	ToBook     int
+	ToChapter  int
+	ToVerse    int
+	ToVerseEnd int
+	Votes      int
+}
+
+// CrossReferences makes a Cross-reference set named filename inside dir with the
+// standard tables, the given info key/value pairs, and the given rows.
+func CrossReferences(t testing.TB, dir, filename string, info map[string]string, rows []CrossReference) string {
+	t.Helper()
+
+	statements := []string{
+		`CREATE TABLE info (name TEXT, value TEXT)`,
+		`CREATE TABLE cross_references (book NUMERIC, chapter NUMERIC, verse NUMERIC, verse_end NUMERIC, book_to NUMERIC, chapter_to NUMERIC, verse_to_start NUMERIC, verse_to_end NUMERIC, votes NUMERIC)`,
+	}
+	statements = append(statements, infoStatements(info)...)
+	for _, row := range rows {
+		statements = append(statements, "INSERT INTO cross_references (book, chapter, verse, verse_end, book_to, chapter_to, verse_to_start, verse_to_end, votes) VALUES ("+
+			itoa(row.Book)+", "+itoa(row.Chapter)+", "+itoa(row.Verse)+", "+itoa(row.VerseEnd)+", "+
+			itoa(row.ToBook)+", "+itoa(row.ToChapter)+", "+itoa(row.ToVerse)+", "+itoa(row.ToVerseEnd)+", "+itoa(row.Votes)+")")
 	}
 	return Create(t, dir, filename, statements...)
 }

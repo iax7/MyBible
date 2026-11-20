@@ -32,6 +32,7 @@ type commentaryModal struct {
 // modal's width.
 type commentaryTab struct {
 	abbreviation string
+	footnotes    bool
 	lines        []string
 }
 
@@ -187,7 +188,8 @@ func (m Model) commentaryTabs(reference module.Reference) ([]commentaryTab, []st
 		}
 		tabs = append(tabs, commentaryTab{
 			abbreviation: commentary.Abbreviation,
-			lines:        m.commentaryLines(blocks, width),
+			footnotes:    commentary.IsFootnotes(),
+			lines:        m.commentaryLines(blocks, width, commentary.IsFootnotes()),
 		})
 	}
 	return tabs, warnings
@@ -203,8 +205,9 @@ func commentaryRowCovers(row module.CommentaryRow, chapter, verse int) bool {
 }
 
 // commentaryLines renders a module's rows for one Verse: a quiet range heading
-// where the row spans more than its own Verse, then the text wrapped to width.
-func (m Model) commentaryLines(rows []module.CommentaryRow, width int) []string {
+// where the row spans more than its own Verse, then the text wrapped to width. A
+// Footnotes Module shows each note behind the marker the Verse text carries.
+func (m Model) commentaryLines(rows []module.CommentaryRow, width int, footnotes bool) []string {
 	var lines []string
 	for i, row := range rows {
 		if i > 0 {
@@ -213,7 +216,11 @@ func (m Model) commentaryLines(rows []module.CommentaryRow, width int) []string 
 		if heading := m.commentaryRange(row); heading != "" {
 			lines = append(lines, m.styles.hint.Render(heading))
 		}
-		for _, line := range splitVerseLines(module.ParseCommentary(row.Text)) {
+		runs := module.ParseCommentary(row.Text)
+		if footnotes && row.Marker != "" {
+			runs = append([]module.Run{{Text: row.Marker + " ", Link: true}}, runs...)
+		}
+		for _, line := range splitVerseLines(runs) {
 			for _, wrapped := range wrapRuns(line, width) {
 				lines = append(lines, m.renderCommentaryRuns(wrapped))
 			}

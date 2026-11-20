@@ -5,7 +5,7 @@ A terminal (TUI) Bible reader for Linux that reads [MyBible](https://mybible.zon
 MyBible stores each translation as a `.SQLite3` file. This reader opens those files
 read-only — no import, no second copy, no new library to maintain.
 
-**Status: 0.1.0, pre-release.** The module format handling and the interface are still
+**Status: 0.3.0, pre-release.** The module format handling and the interface are still
 settling, so the installers below start working with the first tagged release.
 
 ## Install
@@ -49,7 +49,9 @@ go build ./cmd/mybible
 | `v` | Go To |
 | `t` | Translation |
 | `m` | Commentary |
+| `X` | Cross-reference modules |
 | `Enter` | Open commentary |
+| `x` | References |
 | `/` | Search |
 | `H` | History |
 | `L` | Log (only when there are warnings) |
@@ -97,6 +99,18 @@ Commentary modules are found by their declared type, not by file name: every
 module the file calls a `commentaries` module is offered under `m`, whichever
 Bible it was written for. The one you pick labels the verses it covers and opens
 in its own modal on `Enter`, with `Tab` to switch between modules.
+
+Footnotes are shown where the module writes them: the marker the text carries
+(`[1]`, `[1†]`, `ⓐ`) is drawn in the link style, and `Enter` opens the note in
+the Commentary modal, where a module that declares itself Footnotes puts each
+note behind its marker.
+
+Cross-references come from `.crossreferences.SQLite3` modules. `X` lists them and
+`Space` turns each on or off; every Verse the chosen sets speak to ends with
+`[⇅N]`, N being the number of distinct targets after the sets are merged, the
+most voted link winning when two sets share a target. `x` opens the References
+popup: each reference with the passage it points to, read without leaving the
+Chapter. The sets you choose are kept in `active_crossreferences` in the config.
 
 ## License
 

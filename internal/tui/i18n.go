@@ -18,22 +18,24 @@ const (
 // falls back to English with no separate string table.
 var spanish = map[string]string{
 	// Top bar and Help modal.
-	"Book":            "Libro",
-	"Chapter":         "Capítulo",
-	"Go To":           "Ir a",
-	"Translation":     "Traducción",
-	"Commentary":      "Comentario",
-	"Open commentary": "Abrir comentario",
-	"Search":          "Buscar",
-	"History":         "Historial",
-	"Help":            "Ayuda",
-	"Quit":            "Salir",
-	"Keys":            "Teclas",
-	"Movement":        "Movimiento",
-	"Commands":        "Comandos",
-	"Back/Forward":    "Atrás/Adelante",
-	"Toggle top bar":  "Mostrar u ocultar la barra",
-	"Close":           "Cerrar",
+	"Book":                    "Libro",
+	"Chapter":                 "Capítulo",
+	"Go To":                   "Ir a",
+	"Translation":             "Traducción",
+	"Commentary":              "Comentario",
+	"Cross-reference modules": "Módulos de referencias",
+	"Open commentary":         "Abrir comentario",
+	"References":              "Referencias",
+	"Search":                  "Buscar",
+	"History":                 "Historial",
+	"Help":                    "Ayuda",
+	"Quit":                    "Salir",
+	"Keys":                    "Teclas",
+	"Movement":                "Movimiento",
+	"Commands":                "Comandos",
+	"Back/Forward":            "Atrás/Adelante",
+	"Toggle top bar":          "Mostrar u ocultar la barra",
+	"Close":                   "Cerrar",
 
 	// Movement keys, shown in the Help modal.
 	"Verse up/down":     "Versículo arriba/abajo",
@@ -71,6 +73,15 @@ var spanish = map[string]string{
 
 	// The Commentary modal's key hint names the arrows as well as j/k.
 	"tab to switch · ↑/↓, j/k to scroll": "tab para cambiar · ↑/↓, j/k para desplazar",
+	"↑/↓, j/k to scroll":                 "↑/↓, j/k para desplazar",
+	"space to toggle · esc to close":     "espacio para marcar · esc para cerrar",
+
+	// The References popup and the Cross-reference modules selector.
+	"No cross-reference modules active.":                "No hay módulos de referencias activos.",
+	"Press X to choose some.":                           "Pulsa X para elegir algunos.",
+	"No references for this verse.":                     "Sin referencias para este versículo.",
+	"No cross-reference modules found.":                 "No se encontraron módulos de referencias.",
+	"Put your *.crossreferences.SQLite3 modules there.": "Coloca allí tus módulos *.crossreferences.SQLite3.",
 
 	// Reading pane.
 	"Chapter %d": "Capítulo %d",

@@ -91,7 +91,7 @@ func (m Model) renderLines() chapterLines {
 			numStyle = m.styles.cursorNum
 		}
 		indent := lipgloss.Width(number) + 1
-		for j, line := range splitVerseLines(module.ParseMarkup(verse.Text)) {
+		for j, line := range splitVerseLines(module.ParseVerse(verse.Text, m.text.AddsSpaceBeforeFootnoteMarker())) {
 			for k, wrapped := range wrapRuns(line, m.width-indent) {
 				text := m.renderRuns(wrapped)
 				if j == 0 && k == 0 {
@@ -102,6 +102,9 @@ func (m Model) renderLines() chapterLines {
 				out.lines = append(out.lines, text)
 			}
 		}
+		if count := len(m.crossReferencesFor(verse.Number)); count > 0 {
+			out.lines = m.appendCrossReferenceMarker(out.lines, indent, count)
+		}
 		if labels[verse.Number] {
 			out.lines = m.appendCommentaryLabel(out.lines, indent)
 		}
@@ -110,6 +113,22 @@ func (m Model) renderLines() chapterLines {
 		}
 	}
 	return out
+}
+
+// appendCrossReferenceMarker writes the Verse's [⇅N] marker after its last
+// line, or on an indented line of its own when it does not fit. N counts the
+// links that speak to the Verse, each target once across the active sets.
+func (m Model) appendCrossReferenceMarker(lines []string, indent, count int) []string {
+	if len(lines) == 0 {
+		return lines
+	}
+	marker := m.styles.link.Render(fmt.Sprintf("[⇅%d]", count))
+	last := len(lines) - 1
+	if lipgloss.Width(lines[last])+1+lipgloss.Width(marker) <= m.width {
+		lines[last] += " " + marker
+		return lines
+	}
+	return append(lines, strings.Repeat(" ", indent)+marker)
 }
 
 // chapterHeading is the line that opens a Chapter: its number, centred and
@@ -300,6 +319,7 @@ func (m Model) jumpTo(reference module.Reference) (Model, bool) {
 	}
 	m.book, m.chapter, m.cursor, m.top = book, reference.Chapter, cursor, 0
 	m = m.loadCommentary()
+	m = m.loadCrossReferences()
 	return m.ensureVisible(), true
 }
 

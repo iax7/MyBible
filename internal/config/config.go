@@ -21,12 +21,13 @@ const (
 
 // Config is the reader's persisted settings.
 type Config struct {
-	ModuleDir         string `toml:"module_directory"`
-	ActiveTranslation string `toml:"active_translation"`
-	ActiveCommentary  string `toml:"active_commentary"`
-	LastReference     string `toml:"last_reference"`
-	Theme             string `toml:"theme"`
-	Language          string `toml:"language"`
+	ModuleDir             string   `toml:"module_directory"`
+	ActiveTranslation     string   `toml:"active_translation"`
+	ActiveCommentary      string   `toml:"active_commentary"`
+	ActiveCrossReferences []string `toml:"active_crossreferences"`
+	LastReference         string   `toml:"last_reference"`
+	Theme                 string   `toml:"theme"`
+	Language              string   `toml:"language"`
 
 	// PreferredAbbreviations makes the reader use the Preferred abbreviation
 	// set stored beside this file instead of each Module's own short names.

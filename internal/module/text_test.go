@@ -461,3 +461,62 @@ func TestParseMarkup(t *testing.T) {
 		})
 	}
 }
+
+func TestParseVerseKeepsFootnoteMarkers(t *testing.T) {
+	cases := []struct {
+		name        string
+		text        string
+		spaceBefore bool
+		want        []Run
+	}{
+		{
+			name: "marker where the Module writes it",
+			text: "superficie<f>[1]</f> del abismo",
+			want: []Run{{Text: "superficie"}, {Text: "[1]", Marker: true}, {Text: " del abismo"}},
+		},
+		{
+			name:        "space asked for by the Translation",
+			text:        "superficie<f>[1]</f> del abismo",
+			spaceBefore: true,
+			want:        []Run{{Text: "superficie"}, {Text: " [1]", Marker: true}, {Text: " del abismo"}},
+		},
+		{
+			name:        "no second space after one",
+			text:        "superficie <f>[1]</f>",
+			spaceBefore: true,
+			want:        []Run{{Text: "superficie "}, {Text: "[1]", Marker: true}},
+		},
+		{
+			name: "several markers keep their text",
+			text: "a<f>ⓐ</f>b<f>[2†]</f>",
+			want: []Run{{Text: "a"}, {Text: "ⓐ", Marker: true}, {Text: "b"}, {Text: "[2†]", Marker: true}},
+		},
+		{
+			name: "an empty marker is dropped",
+			text: "a<f></f>b",
+			want: []Run{{Text: "a"}, {Text: "b"}},
+		},
+		{
+			name: "the other markup still works",
+			text: "the <i>beginning</i><f>[1]</f>",
+			want: []Run{{Text: "the "}, {Text: "beginning", Italics: true}, {Text: "[1]", Marker: true}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ParseVerse(tc.text, tc.spaceBefore); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ParseVerse(%q, %v) = %+v, want %+v", tc.text, tc.spaceBefore, got, tc.want)
+			}
+		})
+	}
+}
+
+// Search reads Verses through ParseMarkup, so a Footnote marker stays out of
+// what is searched and shown as a snippet.
+func TestFootnoteMarkersStayOutOfTheSearchText(t *testing.T) {
+	verse := Verse{Text: "la superficie<f>[1]</f> del abismo"}
+
+	if got := displayText(verse.Text); got != "la superficie del abismo" {
+		t.Errorf("displayText = %q, want the marker hidden", got)
+	}
+}

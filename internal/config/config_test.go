@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestLoadReturnsAnEmptyConfigWhenTheFileIsMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load on a missing file: %v", err)
 	}
-	if got != (Config{}) {
+	if !reflect.DeepEqual(got, Config{}) {
 		t.Errorf("Load = %+v, want a zero Config", got)
 	}
 }
@@ -22,6 +23,7 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 		ModuleDir:              "/home/me/modules",
 		ActiveTranslation:      "RST",
 		ActiveCommentary:       "MAC",
+		ActiveCrossReferences:  []string{"OBX", "TSK-x"},
 		LastReference:          "John 3:16",
 		Theme:                  "light",
 		Language:               "es",
@@ -36,8 +38,27 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load = %+v, want %+v", got, want)
+	}
+}
+
+// A config that lists no Cross-reference set keeps it that way, which is how the
+// reader tells "show none" from "never chose".
+func TestSaveKeepsAnEmptyCrossReferenceList(t *testing.T) {
+	dir := t.TempDir()
+	if err := Save(dir, Config{ActiveCrossReferences: []string{}}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.ActiveCrossReferences == nil {
+		t.Error("Load returned a nil list for a config that names an empty one")
+	}
+	if len(got.ActiveCrossReferences) != 0 {
+		t.Errorf("Load = %v, want no sets", got.ActiveCrossReferences)
 	}
 }
 

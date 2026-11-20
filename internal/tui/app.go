@@ -27,7 +27,9 @@ var Commands = []Command{
 	{"v", "Go To"},
 	{"t", "Translation"},
 	{"m", "Commentary"},
+	{keySelectCrossReferences, "Cross-reference modules"},
 	{keyEnter, "Open commentary"},
+	{keyCrossReferences, "References"},
 	{"/", "Search"},
 	{"H", "History"},
 	{keyLog, "Log"},
@@ -60,25 +62,27 @@ var MovementCommands = []Command{
 
 // Keys that open a modal or a command.
 const (
-	keyQuit        = "q"
-	keyForceQuit   = "ctrl+c"
-	keyToggleBar   = "ctrl+b"
-	keyHelp        = "?"
-	keyBook        = "b"
-	keyChapter     = "c"
-	keyReference   = "v"
-	keyTranslation = "t"
-	keyCommentary  = "m"
-	keySearch      = "/"
-	keyHistory     = "H"
-	keyLog         = "L"
-	keyEnter       = "enter"
-	keyTab         = "tab"
-	keyPrevTab     = "shift+tab"
-	keyClose       = "esc"
-	keyUp          = "up"
-	keyDown        = "down"
-	keyBackspace   = "backspace"
+	keyQuit                  = "q"
+	keyForceQuit             = "ctrl+c"
+	keyToggleBar             = "ctrl+b"
+	keyHelp                  = "?"
+	keyBook                  = "b"
+	keyChapter               = "c"
+	keyReference             = "v"
+	keyTranslation           = "t"
+	keyCommentary            = "m"
+	keyCrossReferences       = "x"
+	keySelectCrossReferences = "X"
+	keySearch                = "/"
+	keyHistory               = "H"
+	keyLog                   = "L"
+	keyEnter                 = "enter"
+	keyTab                   = "tab"
+	keyPrevTab               = "shift+tab"
+	keyClose                 = "esc"
+	keyUp                    = "up"
+	keyDown                  = "down"
+	keyBackspace             = "backspace"
 )
 
 // Keys that move the Verse cursor and the Chapter view.
@@ -103,16 +107,18 @@ const (
 
 // Modal titles.
 const (
-	selectTranslation        = "Select Translation"
-	selectAbbreviationSource = "Select Abbreviation Source"
-	selectCommentary         = "Select Commentary"
-	selectBook               = "Select Book"
-	selectChapter            = "Select Chapter"
-	selectReference          = "Go to Reference"
-	searchTitle              = "Search"
-	historyTitle             = "History"
-	logTitle                 = "Log"
-	commentaryTitle          = "Commentary"
+	selectTranslation           = "Select Translation"
+	selectAbbreviationSource    = "Select Abbreviation Source"
+	selectCommentary            = "Select Commentary"
+	selectBook                  = "Select Book"
+	selectChapter               = "Select Chapter"
+	selectReference             = "Go to Reference"
+	searchTitle                 = "Search"
+	historyTitle                = "History"
+	logTitle                    = "Log"
+	commentaryTitle             = "Commentary"
+	crossReferencesTitle        = "References"
+	selectCrossReferenceModules = "Cross-reference modules"
 )
 
 const emptyReference = "—"
@@ -134,6 +140,7 @@ type Reader interface {
 	BookIndex(number int) int
 	Chapter(number, chapter int) []module.Verse
 	Subheadings(number, chapter int) []module.Subheading
+	AddsSpaceBeforeFootnoteMarker() bool
 	Search(query string) []module.Result
 }
 
@@ -155,6 +162,12 @@ type Model struct {
 	activeCommentary string
 	commentary       commentaryChapter // the Active commentary's rows for the current Chapter
 	commentaryModal  commentaryModal
+
+	crossReferenceSets    []module.CrossReferenceSet
+	activeCrossReferences []string
+	crossReferences       crossReferenceChapter // the active sets' rows for the current Chapter
+	crossReferencesModal  crossReferencesModal
+	crossReferencesPicker crossReferencesPicker
 
 	cfg    config.Config // the loaded config, kept so saving state does not drop keys
 	lang   lang
@@ -218,6 +231,10 @@ func New(opts Options) Model {
 		commentaries, warnings := module.DiscoverCommentaries(m.moduleDir)
 		m.commentaries = commentaries
 		m.warnings = append(m.warnings, warnings...)
+
+		crossReferenceSets, warnings := module.DiscoverCrossReferences(m.moduleDir)
+		m.crossReferenceSets = crossReferenceSets
+		m.warnings = append(m.warnings, warnings...)
 	}
 
 	seedAbbreviations := false
@@ -235,6 +252,13 @@ func New(opts Options) Model {
 		default:
 			m.abbreviations = set
 		}
+	}
+
+	// A config that has never named a Cross-reference set starts with the first
+	// one installed; an empty list is the reader's own choice to show none.
+	m.activeCrossReferences = cfg.ActiveCrossReferences
+	if cfg.ActiveCrossReferences == nil && len(m.crossReferenceSets) > 0 {
+		m.activeCrossReferences = []string{m.crossReferenceSets[0].Abbreviation}
 	}
 
 	m.activeCommentary = cfg.ActiveCommentary
@@ -281,7 +305,7 @@ func (m Model) loadActive() Model {
 	if books := text.Books(); len(books) > 0 {
 		m.book, m.chapter = books[0], 1
 	}
-	return m.loadCommentary()
+	return m.loadCommentary().loadCrossReferences()
 }
 
 // StartupError reports why the reader cannot run: there is no Module directory,
@@ -313,6 +337,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.commentaryModal.open {
 			m = m.openCommentaryAt(m.commentaryModal.reference)
 		}
+		if m.crossReferencesModal.open {
+			m = m.openCrossReferencesAt(m.crossReferencesModal.reference)
+		}
 		if m.picker.isOpen() { // the modal's size may no longer fit the new screen
 			m.picker.width, m.picker.height = 0, 0
 			m.picker.remember(m)
@@ -328,6 +355,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.help = false
 			}
 			return m, nil
+		}
+		if m.crossReferencesModal.open {
+			return m.updateCrossReferences(msg)
+		}
+		if m.crossReferencesPicker.open {
+			return m.updateCrossReferencesPicker(msg)
 		}
 		if m.commentaryModal.open {
 			return m.updateCommentary(msg)
@@ -352,6 +385,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.openPicker(pickerTranslation)
 		case keyCommentary:
 			m = m.openPicker(pickerCommentary)
+		case keyCrossReferences:
+			m = m.openCrossReferences()
+		case keySelectCrossReferences:
+			m = m.openCrossReferencesPicker()
 		case keyEnter:
 			m = m.openCommentary()
 		case keySearch:
@@ -399,6 +436,7 @@ func (m Model) persist() Model {
 	cfg.ModuleDir = m.moduleDir
 	cfg.ActiveTranslation = m.active
 	cfg.ActiveCommentary = m.activeCommentary
+	cfg.ActiveCrossReferences = m.activeCrossReferences
 	cfg.LastReference = ""
 	if reference, ok := m.currentReference(); ok {
 		cfg.LastReference = reference.String()
@@ -439,6 +477,10 @@ func (m Model) modalView() string {
 	switch {
 	case m.help:
 		return m.helpView()
+	case m.crossReferencesModal.open:
+		return m.crossReferencesView()
+	case m.crossReferencesPicker.open:
+		return m.crossReferencesPickerView()
 	case m.commentaryModal.open:
 		return m.commentaryView()
 	case m.picker.isOpen():
@@ -565,6 +607,8 @@ func (m Model) renderRuns(runs []module.Run) string {
 // color even inside a <J> span.
 func (m Model) runStyle(run module.Run) lipgloss.Style {
 	switch {
+	case run.Marker:
+		return m.styles.link
 	case run.Italics:
 		return m.styles.italics
 	case run.Red:
