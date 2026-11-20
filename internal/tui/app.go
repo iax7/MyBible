@@ -284,6 +284,24 @@ func (m Model) loadActive() Model {
 	return m.loadCommentary()
 }
 
+// StartupError reports why the reader cannot run: there is no Module directory,
+// or it holds no Bible Modules. Neither leaves anything to do in the interface,
+// so the caller reports the problem instead of opening it.
+func (m Model) StartupError() error {
+	switch {
+	case m.moduleDir == "":
+		return fmt.Errorf("%s %s %s",
+			m.translate("No Module directory configured."),
+			fmt.Sprintf(m.translate("Set module_directory in %s"), config.Path(m.configDir)),
+			m.translate("to the folder holding your MyBible *.SQLite3 modules."))
+	case len(m.translations) == 0:
+		return fmt.Errorf("%s %s",
+			fmt.Sprintf(m.translate("No Bible Modules found in %s."), m.moduleDir),
+			m.translate("Put your *.SQLite3 modules there, then restart the reader."))
+	}
+	return nil
+}
+
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
 

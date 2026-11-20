@@ -47,10 +47,31 @@ func TestTheDefaultModuleDirectoryIsUsedWhenConfigNamesNone(t *testing.T) {
 	}
 }
 
-func TestAnEmptyModuleDirectoryExplainsItself(t *testing.T) {
-	got := render(t, newReader(t, t.TempDir(), t.TempDir()))
-	if !strings.Contains(got, "No Bible Modules") {
-		t.Errorf("empty Module directory has no message\n%s", got)
+func TestAnEmptyModuleDirectoryIsReportedBeforeTheInterfaceOpens(t *testing.T) {
+	m := New(Options{ConfigDir: t.TempDir(), ModuleDir: t.TempDir()})
+	err := m.StartupError()
+	if err == nil || !strings.Contains(err.Error(), "No Bible Modules") {
+		t.Errorf("StartupError() = %v, want a missing Modules message", err)
+	}
+}
+
+func TestAModuleDirectoryStartsTheInterface(t *testing.T) {
+	dir := t.TempDir()
+	modtest.Bible(t, dir, "RST.SQLite3", map[string]string{"description": "Reina-Valera 1909"})
+
+	if err := New(Options{ConfigDir: t.TempDir(), ModuleDir: dir}).StartupError(); err != nil {
+		t.Errorf("StartupError() = %v, want nil", err)
+	}
+}
+
+func TestNoModuleDirectoryIsReportedBeforeTheInterfaceOpens(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "")
+
+	m := New(Options{ConfigDir: t.TempDir()})
+	err := m.StartupError()
+	if err == nil || !strings.Contains(err.Error(), "No Module directory") {
+		t.Errorf("StartupError() = %v, want a missing Module directory message", err)
 	}
 }
 
